@@ -1,0 +1,30 @@
+name: Build
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential cmake make python3 cc65
+
+      - name: Build emulator
+        run: |
+          cmake -S emulator/src -B emulator/build
+          cmake --build emulator/build -j$(nproc)
+
+      - name: Build BCOS
+        run: make -C src
+
+      - name: Build programs
+        run: make -C programs

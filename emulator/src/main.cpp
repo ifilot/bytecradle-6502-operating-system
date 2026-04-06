@@ -24,8 +24,7 @@
 #include <iostream>
 #include <atomic>
 #include <csignal>
-
-#include <tclap/CmdLine.h>
+#include <string>
 
 #include "bytecradletiny.h"
 #include "bytecradlemini.h"
@@ -34,6 +33,88 @@
 // anonymous namespace
 namespace {
     std::atomic<bool> g_should_exit { false };
+
+    struct EmulatorOptions {
+        std::string board_type {"tiny"};
+        std::string rom_path;
+        std::string sdcard_path;
+        double clock_mhz {16.0};
+        bool debug_mode {false};
+        bool show_help {false};
+    };
+
+    void print_usage(const char* argv0) {
+        std::cout
+            << "ByteCradle Emulator\n\n"
+            << "Usage:\n"
+            << "  " << argv0 << " -b <tiny|mini> -r <rom_path> [options]\n\n"
+            << "Options:\n"
+            << "  -b, --board   Board type (tiny or mini)\n"
+            << "  -r, --rom     Path to ROM file\n"
+            << "  -s, --sdcard  Path to SD card image (required for mini)\n"
+            << "  -c, --clock   CPU clock speed in MHz (default: 16.0)\n"
+            << "  -d, --debug   Enable debug mode\n"
+            << "  -h, --help    Show this help message\n";
+    }
+
+    bool parse_args(int argc, char** argv, EmulatorOptions& options) {
+        for (int i = 1; i < argc; ++i) {
+            const std::string arg = argv[i];
+
+            auto require_value = [&](const std::string& flag, std::string& out) -> bool {
+                if (i + 1 >= argc) {
+                    std::cerr << "Error: Missing value for " << flag << ".\n";
+                    return false;
+                }
+                out = argv[++i];
+                return true;
+            };
+
+            if (arg == "-h" || arg == "--help") {
+                options.show_help = true;
+                return true;
+            } else if (arg == "-b" || arg == "--board") {
+                if (!require_value(arg, options.board_type)) {
+                    return false;
+                }
+            } else if (arg == "-r" || arg == "--rom") {
+                if (!require_value(arg, options.rom_path)) {
+                    return false;
+                }
+            } else if (arg == "-s" || arg == "--sdcard") {
+                if (!require_value(arg, options.sdcard_path)) {
+                    return false;
+                }
+            } else if (arg == "-c" || arg == "--clock") {
+                std::string raw_clock;
+                if (!require_value(arg, raw_clock)) {
+                    return false;
+                }
+                try {
+                    options.clock_mhz = std::stod(raw_clock);
+                } catch (...) {
+                    std::cerr << "Error: Invalid clock value '" << raw_clock << "'.\n";
+                    return false;
+                }
+                if (options.clock_mhz <= 0.0) {
+                    std::cerr << "Error: Clock speed must be greater than zero.\n";
+                    return false;
+                }
+            } else if (arg == "-d" || arg == "--debug") {
+                options.debug_mode = true;
+            } else {
+                std::cerr << "Error: Unknown argument '" << arg << "'.\n";
+                return false;
+            }
+        }
+
+        if (options.rom_path.empty() && !options.show_help) {
+            std::cerr << "Error: ROM path must be specified using -r / --rom.\n";
+            return false;
+        }
+
+        return true;
+    }
 
     void handle_sigint(int) {
         g_should_exit = true;
@@ -46,98 +127,80 @@ namespace {
 }
 
 int main(int argc, char** argv) {
-    try {
-        TCLAP::CmdLine cmd("ByteCradle Emulator", ' ', "1.0");
+    EmulatorOptions options;
+    if (!parse_args(argc, argv, options)) {
+        print_usage(argv[0]);
+        return 1;
+    }
 
-        // Arguments
-        TCLAP::ValueArg<std::string> boardArg("b", "board", "Board type (tiny or mini)", true, "tiny", "string");
-        TCLAP::ValueArg<std::string> romArg("r", "rom", "Path to ROM file", true, "", "string");
-        TCLAP::ValueArg<std::string> sdcardArg("s", "sdcard", "Path to SD card image (required if board=mini)", false, "", "string");
-        TCLAP::ValueArg<double> clockArg("c", "clock", "Clock speed in MHz", false, 16.0, "double");
-        TCLAP::SwitchArg debugArg("d", "debug", "Enable debug mode", false);
+    if (options.show_help) {
+        print_usage(argv[0]);
+        return 0;
+    }
 
-        cmd.add(boardArg);
-        cmd.add(romArg);
-        cmd.add(sdcardArg);
-        cmd.add(clockArg);
-        cmd.add(debugArg);
+    double cpuFrequency = options.clock_mhz * 1'000'000.0; // Convert MHz to Hz
 
-        cmd.parse(argc, argv);
-
-        // Read the values
-        std::string board_type = boardArg.getValue();
-        std::string rom_path = romArg.getValue();
-        std::string sdcard_path = sdcardArg.getValue();
-        double cpuFrequency = clockArg.getValue() * 1'000'000.0; // Convert MHz to Hz
-        bool debug_mode = debugArg.getValue();
-
-        // Validate board type
-        std::unique_ptr<ByteCradleBoard> board;
-
-        if (board_type == "tiny") {
-            board = std::make_unique<ByteCradleTiny>(rom_path, debug_mode);
-        } else if (board_type == "mini") {
-            if (sdcard_path.empty()) {
-                std::cerr << "Error: SD card image must be specified for 'mini' board.\n";
-                return 1;
-            }
-            board = std::make_unique<ByteCradleMini>(rom_path, sdcard_path, debug_mode);
-        } else {
-            std::cerr << "Error: Invalid board type specified ('" << board_type << "'). Must be 'tiny' or 'mini'.\n";
+    std::unique_ptr<ByteCradleBoard> board;
+    if (options.board_type == "tiny") {
+        board = std::make_unique<ByteCradleTiny>(options.rom_path, options.debug_mode);
+    } else if (options.board_type == "mini") {
+        if (options.sdcard_path.empty()) {
+            std::cerr << "Error: SD card image must be specified for 'mini' board.\n";
             return 1;
         }
+        board = std::make_unique<ByteCradleMini>(options.rom_path, options.sdcard_path, options.debug_mode);
+    } else {
+        std::cerr << "Error: Invalid board type specified ('" << options.board_type
+                  << "'). Must be 'tiny' or 'mini'.\n";
+        return 1;
+    }
 
-        if (!TerminalRawMode::has_minimum_terminal_size(80, 25)) {
-            std::cerr << "Error: Terminal size too small. Need at least 80x25.\n";
-            return 1;
+    if (!TerminalRawMode::has_minimum_terminal_size(80, 25)) {
+        std::cerr << "Error: Terminal size too small. Need at least 80x25.\n";
+        return 1;
+    }
+
+    std::signal(SIGINT, handle_sigint);
+
+    TerminalRawMode terminal;
+    board->reset();
+
+    constexpr auto keyboardPollInterval = std::chrono::milliseconds(20); // 20 ms keyboard poll
+    auto tickInterval = std::chrono::nanoseconds(static_cast<int>(1'000'000'000.0 / cpuFrequency));
+
+    auto lastTickTime = std::chrono::steady_clock::now();
+    auto lastKeyPollTime = lastTickTime;
+
+    while (!g_should_exit.load()) {
+        auto now = std::chrono::steady_clock::now();
+
+        // CPU ticking at precise frequency
+        if (now - lastTickTime >= tickInterval) {
+            board->tick();
+            lastTickTime += tickInterval;
         }
 
-        std::signal(SIGINT, handle_sigint);
-
-        TerminalRawMode terminal;
-        board->reset();
-
-        constexpr auto keyboardPollInterval = std::chrono::milliseconds(20); // 20 ms keyboard poll
-        auto tickInterval = std::chrono::nanoseconds(static_cast<int>(1'000'000'000.0 / cpuFrequency));
-
-        auto lastTickTime = std::chrono::steady_clock::now();
-        auto lastKeyPollTime = lastTickTime;
-
-        while (!g_should_exit.load()) {
-            auto now = std::chrono::steady_clock::now();
-
-            // CPU ticking at precise frequency
-            if (now - lastTickTime >= tickInterval) {
-                board->tick();
-                lastTickTime += tickInterval;
+        // Poll keyboard every 20ms independently
+        if (now - lastKeyPollTime >= keyboardPollInterval) {
+            auto poll_result = TerminalRawMode::poll_key();
+            if (poll_result.eof) {
+                g_should_exit = true;
+                break;
             }
 
-            // Poll keyboard every 20ms independently
-            if (now - lastKeyPollTime >= keyboardPollInterval) {
-                auto poll_result = TerminalRawMode::poll_key();
-                if (poll_result.eof) {
+            if (poll_result.key.has_value()) {
+                if (is_exit_key(*poll_result.key)) {
                     g_should_exit = true;
                     break;
                 }
 
-                if (poll_result.key.has_value()) {
-                    if (is_exit_key(*poll_result.key)) {
-                        g_should_exit = true;
-                        break;
-                    }
-
-                    board->keypress(static_cast<char>(*poll_result.key));
-                }
-                lastKeyPollTime += keyboardPollInterval;
+                board->keypress(static_cast<char>(*poll_result.key));
             }
+            lastKeyPollTime += keyboardPollInterval;
         }
-
-        std::cout << "\n[emulator] Exit requested. Shutting down...\n";
-
-    } catch (TCLAP::ArgException& e) {
-        std::cerr << "Error: " << e.error() << " for arg " << e.argId() << std::endl;
-        return 1;
     }
+
+    std::cout << "\n[emulator] Exit requested. Shutting down...\n";
 
     return 0;
 }

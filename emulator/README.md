@@ -20,12 +20,11 @@ ROMs and optional SD card images.
 
 * Make sure you have a C++17 (or newer) compiler installed and the CMake
   utilities.
-* You also need the **TCLAP** library installed or available.
 
 ### Dependencies
 
 ```bash
-sudo apt update && sudo apt install build-essential cmake libtclap-dev
+sudo apt update && sudo apt install build-essential cmake
 ```
 
 ### Build instructions (with CMake)

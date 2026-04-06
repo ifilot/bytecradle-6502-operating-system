@@ -56,7 +56,8 @@ public:
      */
     ByteCradleMini(const std::string& romfile, 
                    const std::string& sdcardfile,
-                   bool _debug_mode = false
+                   bool _debug_mode = false,
+                   bool _warnings_as_errors = false
                   );
 
     /**

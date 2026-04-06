@@ -27,6 +27,7 @@ def test_ls_and_dir_work_across_multiple_folders() -> None:
             str(sd_image),
             "--clock",
             "12.0",
+            "--warnings-as-errors",
         ]
     )
 

@@ -26,6 +26,7 @@
 #include <iostream>
 #include <cstring>
 #include <memory>
+#include <string>
 
 #include "vrEmu6502/vrEmu6502.h"
 #include "acia.h"
@@ -78,6 +79,16 @@ public:
 
     inline auto& get_acia() { return this->acia; }
 
+    /**
+     * @brief Returns true when the emulator should stop execution.
+     */
+    inline bool should_stop() const { return this->stop_requested; }
+
+    /**
+     * @brief Returns true when warnings are promoted to fatal errors.
+     */
+    inline bool are_warnings_fatal() const { return this->warnings_as_errors; }
+
 protected:
     std::unique_ptr<ACIA> acia;     // Pointer to the ACIA object
 
@@ -85,9 +96,19 @@ protected:
     vrEmu6502Interrupt *irq;
 
     bool debug_mode = false;
+    bool warnings_as_errors = false;
+    bool stop_requested = false;
 
     inline auto& get_keybuffer() { return this->acia->get_keybuffer(); }
     inline auto& get_irq() { return irq; }
+
+    /**
+     * @brief Emit a warning exception event.
+     *
+     * By default this logs a warning. When warnings_as_errors is enabled, this
+     * is promoted to a fatal error and marks the emulator for shutdown.
+     */
+    void warning_exception(const std::string& message);
 
     /**
      * @brief Load a file into memory (typically ROM)

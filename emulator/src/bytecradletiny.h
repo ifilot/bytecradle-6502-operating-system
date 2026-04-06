@@ -41,7 +41,9 @@ public:
      * @param romfile path to the ROM file
      * @param debug_mode whether to run in debugging mode
      */
-    ByteCradleTiny(const std::string& romfile, bool _debug_mode = false);
+    ByteCradleTiny(const std::string& romfile,
+                   bool _debug_mode = false,
+                   bool _warnings_as_errors = false);
 
     /**
      * @brief Destroy the Byte Cradle Tiny object

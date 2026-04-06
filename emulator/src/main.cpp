@@ -40,6 +40,7 @@ namespace {
         std::string sdcard_path;
         double clock_mhz {16.0};
         bool debug_mode {false};
+        bool warnings_as_errors {false};
         bool show_help {false};
     };
 
@@ -54,6 +55,7 @@ namespace {
             << "  -s, --sdcard  Path to SD card image (required for mini)\n"
             << "  -c, --clock   CPU clock speed in MHz (default: 16.0)\n"
             << "  -d, --debug   Enable debug mode\n"
+            << "  -w, --warnings-as-errors  Treat warning exceptions as fatal errors\n"
             << "  -h, --help    Show this help message\n";
     }
 
@@ -102,6 +104,8 @@ namespace {
                 }
             } else if (arg == "-d" || arg == "--debug") {
                 options.debug_mode = true;
+            } else if (arg == "-w" || arg == "--warnings-as-errors") {
+                options.warnings_as_errors = true;
             } else {
                 std::cerr << "Error: Unknown argument '" << arg << "'.\n";
                 return false;
@@ -142,13 +146,22 @@ int main(int argc, char** argv) {
 
     std::unique_ptr<ByteCradleBoard> board;
     if (options.board_type == "tiny") {
-        board = std::make_unique<ByteCradleTiny>(options.rom_path, options.debug_mode);
+        board = std::make_unique<ByteCradleTiny>(
+            options.rom_path,
+            options.debug_mode,
+            options.warnings_as_errors
+        );
     } else if (options.board_type == "mini") {
         if (options.sdcard_path.empty()) {
             std::cerr << "Error: SD card image must be specified for 'mini' board.\n";
             return 1;
         }
-        board = std::make_unique<ByteCradleMini>(options.rom_path, options.sdcard_path, options.debug_mode);
+        board = std::make_unique<ByteCradleMini>(
+            options.rom_path,
+            options.sdcard_path,
+            options.debug_mode,
+            options.warnings_as_errors
+        );
     } else {
         std::cerr << "Error: Invalid board type specified ('" << options.board_type
                   << "'). Must be 'tiny' or 'mini'.\n";
@@ -177,6 +190,10 @@ int main(int argc, char** argv) {
         // CPU ticking at precise frequency
         if (now - lastTickTime >= tickInterval) {
             board->tick();
+            if (board->should_stop()) {
+                g_should_exit = true;
+                break;
+            }
             lastTickTime += tickInterval;
         }
 

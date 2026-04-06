@@ -19,6 +19,7 @@
  **************************************************************************/
 
 #include "bytecradletiny.h"
+#include <cstdio>
 
 /**
  * @brief Construct a new ByteCradleTiny object
@@ -27,11 +28,13 @@
  * @param debug_mode whether to run in debugging mode
  */
 ByteCradleTiny::ByteCradleTiny(const std::string& romfile,
-                               bool _debug_mode) {
+                               bool _debug_mode,
+                               bool _warnings_as_errors) {
     // initialize CPU
     cpu = vrEmu6502New(CPU_W65C02, memread, memwrite, this);
     irq = vrEmu6502Int(cpu);
     debug_mode = _debug_mode;
+    warnings_as_errors = _warnings_as_errors;
 
     // set memory
     memset(this->ram, 0x00, sizeof(this->ram));
@@ -95,7 +98,6 @@ uint8_t ByteCradleTiny::memread(VrEmu6502 *cpu, uint16_t addr, bool isDbg) {
 void ByteCradleTiny::memwrite(VrEmu6502 *cpu, uint16_t addr, uint8_t val) {
     auto obj = static_cast<ByteCradleTiny*>(vrEmu6502GetUserData(cpu));
     auto &ram = obj->get_ram();
-    auto &rom = obj->get_rom();
     
     // store in lower memory
     if (addr < 0x7F00) {
@@ -115,6 +117,13 @@ void ByteCradleTiny::memwrite(VrEmu6502 *cpu, uint16_t addr, uint8_t val) {
 
     if(addr == 0x7F01) {
         // control line 2; does not require any output
+        return;
+    }
+
+    if (addr >= 0x8000) {
+        char buffer[64];
+        std::snprintf(buffer, sizeof(buffer), "Write to read-only ROM at $%04X.", addr);
+        obj->warning_exception(buffer);
         return;
     }
 

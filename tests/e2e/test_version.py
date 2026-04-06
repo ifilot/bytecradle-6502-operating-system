@@ -33,6 +33,7 @@ def test_boot_prints_version_and_build_timestamp() -> None:
             str(sd_image),
             "--clock",
             "12.0",
+            "--warnings-as-errors",
         ]
     )
 
@@ -67,6 +68,7 @@ def test_version_command_prints_version_and_build_timestamp() -> None:
             str(sd_image),
             "--clock",
             "12.0",
+            "--warnings-as-errors",
         ]
     )
 

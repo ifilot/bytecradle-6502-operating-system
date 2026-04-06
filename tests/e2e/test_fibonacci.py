@@ -28,6 +28,7 @@ def test_can_boot_bcos_and_run_fibo_from_sdcard() -> None:
             str(sd_image),
             "--clock",
             "12.0",
+            "--warnings-as-errors",
         ]
     )
 

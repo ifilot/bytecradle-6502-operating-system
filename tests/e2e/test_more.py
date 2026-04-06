@@ -33,6 +33,7 @@ def test_more_supports_paging_and_binary_guard(tmp_path: pathlib.Path) -> None:
             str(test_sd),
             "--clock",
             "12.0",
+            "--warnings-as-errors",
         ]
     )
 

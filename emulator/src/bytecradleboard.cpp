@@ -72,3 +72,13 @@ bool ByteCradleBoard::load_file_into_memory(const char* filename, uint8_t* memor
 
     return true;
 }
+
+void ByteCradleBoard::warning_exception(const std::string& message) {
+    if (this->warnings_as_errors) {
+        std::cerr << "[ERROR] " << message << " (warnings-as-errors enabled)\n";
+        this->stop_requested = true;
+        return;
+    }
+
+    std::cerr << "[WARNING] " << message << '\n';
+}

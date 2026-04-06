@@ -10,7 +10,7 @@ def test_can_run_program_and_capture_output(tmp_path: pathlib.Path) -> None:
     write_test_rom(rom_path)
 
     proc, master_fd = spawn_emulator(
-        [str(EMU), "--board", "tiny", "--rom", str(rom_path), "--clock", "1.0"]
+        [str(EMU), "--board", "tiny", "--rom", str(rom_path), "--clock", "1.0", "--warnings-as-errors"]
     )
 
     try:
@@ -38,6 +38,7 @@ def test_bcos_binary_boots_and_prints_startup(tmp_path: pathlib.Path) -> None:
             str(fake_sd),
             "--clock",
             "12.0",
+            "--warnings-as-errors",
         ]
     )
 

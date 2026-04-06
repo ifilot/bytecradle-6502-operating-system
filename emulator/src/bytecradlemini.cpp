@@ -19,6 +19,7 @@
  **************************************************************************/
 
 #include "bytecradlemini.h"
+#include <cstdio>
 
 /**
  * @brief Construct a new ByteCradleMini object
@@ -29,10 +30,12 @@
  */
 ByteCradleMini::ByteCradleMini(const std::string& romfile, 
                                const std::string& sdcardfile,
-                               bool _debug_mode) {
+                               bool _debug_mode,
+                               bool _warnings_as_errors) {
     cpu = vrEmu6502New(CPU_W65C02, memread, memwrite, this);
     irq = vrEmu6502Int(cpu);
     debug_mode = _debug_mode;
+    warnings_as_errors = _warnings_as_errors;
 
     // set memory
     memset(this->ram, 0x00, sizeof(this->ram));
@@ -128,7 +131,6 @@ uint8_t ByteCradleMini::memread(VrEmu6502 *cpu, uint16_t addr, bool isDbg) {
 void ByteCradleMini::memwrite(VrEmu6502 *cpu, uint16_t addr, uint8_t val) {
     auto obj = static_cast<ByteCradleMini*>(vrEmu6502GetUserData(cpu));
     auto &ram = obj->get_ram();
-    const auto &rom = obj->get_rom();
     
     // store in lower memory
     if (addr < 0x7F00) {
@@ -164,6 +166,13 @@ void ByteCradleMini::memwrite(VrEmu6502 *cpu, uint16_t addr, uint8_t val) {
     // VIA chip
     if(obj->get_via()->responds(addr)) {
         obj->get_via()->write(addr, val);
+        return;
+    }
+
+    if ((addr >= 0xA000 && addr <= 0xBFFF) || addr >= 0xC000) {
+        char buffer[64];
+        std::snprintf(buffer, sizeof(buffer), "Write to read-only ROM at $%04X.", addr);
+        obj->warning_exception(buffer);
         return;
     }
 

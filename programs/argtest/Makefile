@@ -1,4 +1,4 @@
-PROG = FIBO.COM
+PROG = ARGTEST.COM
 
 all: $(PROG)
 

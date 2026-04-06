@@ -5,7 +5,7 @@
 .import __HEADER_LOAD__                     ; import start location
 
 .export   _init, _exit
-.import   _main, _charout
+.import   _callmain, _charout
 
 .export   __STARTUP__ : absolute = 1        ; Mark as startup
 .import   __RAM_START__, __RAM_SIZE__       ; Linker generated
@@ -46,7 +46,14 @@ _init:
 ; Call main()
 ; ---------------------------------------------------------------------------
 
-          JSR     _main
+          JSR     callmain
+
+; ---------------------------------------------------------------------------
+; call main(argc, argv) through C helper
+; ---------------------------------------------------------------------------
+
+callmain:  JSR     _callmain
+          RTS
 
 ; ---------------------------------------------------------------------------
 ; Back from main (this is also the _exit entry):  force a software break

@@ -117,5 +117,6 @@ mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/diag/DIAG.COM" ::/PROGRAMS/DIAG.COM
 mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/fibonacci/FIBO.COM" ::/PROGRAMS/FIBO.COM
 mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/monitor/monitor.bin" ::/PROGRAMS/MONITOR.COM
 mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/mandelbrot/MANDEL.COM" ::/PROGRAMS/MANDEL.COM
+mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/argtest/ARGTEST.COM" ::/PROGRAMS/ARGTEST.COM
 
 echo "SD card image creation completed: $IMAGE_NAME"

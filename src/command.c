@@ -27,6 +27,10 @@ static uint8_t command_argc;
 static uint8_t command_parse_too_many_args;
 static char* command_ptr = command_buffer;
 
+#define BCOS_ARGC_ADDR       ((uint8_t*)0x0600)
+#define BCOS_ARGV_TABLE_ADDR ((char**)0x0601)
+#define BCOS_ARGV_STR_ADDR   ((char*)0x0630)
+
 static const CommandEntry command_table[] = {
     { "LS", command_ls },
     { "DIR", command_ls },
@@ -175,8 +179,38 @@ void command_parse() {
     command_argv[command_argc] = NULL;
 
     for(i=0; i<command_argc; i++) {
-        strupper(command_argv[i]);
+        if(i == 0) {
+            strupper(command_argv[i]);
+        }
     }
+}
+
+/**
+ * @brief Copy parsed command line arguments to a fixed RAM location.
+ */
+static void command_store_program_args() {
+    uint8_t i;
+    uint8_t j;
+    uint8_t argc = command_argc;
+    char* strptr = BCOS_ARGV_STR_ADDR;
+    char** argv = BCOS_ARGV_TABLE_ADDR;
+
+    if(argc > (sizeof(command_argv) / sizeof(command_argv[0]) - 1)) {
+        argc = sizeof(command_argv) / sizeof(command_argv[0]) - 1;
+    }
+
+    *BCOS_ARGC_ADDR = argc;
+
+    for(i=0; i<argc; i++) {
+        argv[i] = strptr;
+        j = 0;
+        while(command_argv[i][j] != '\0') {
+            *(strptr++) = command_argv[i][j++];
+        }
+        *(strptr++) = '\0';
+    }
+
+    argv[argc] = NULL;
 }
 
 /**
@@ -365,6 +399,8 @@ uint8_t command_try_com() {
         putstrnl("File too large to fit in memory");
         return 0xFF;
     }
+
+    command_store_program_args();
 
     program = (void(*)(void))(addr+2);
     program();

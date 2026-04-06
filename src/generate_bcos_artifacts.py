@@ -160,6 +160,9 @@ def generate_c_header() -> str:
 #define BCOS_JT_PUTDEC    0x{names['BCOS_JT_PUTDEC']:04X}u
 #define BCOS_JT_GETCH     0x{names['BCOS_JT_GETCH']:04X}u
 
+#define BCOS_ARGC_ADDR    0x0600u
+#define BCOS_ARGV_ADDR    0x0601u
+
 #define bcos_abi_major ((uint8_t (*)(void))BCOS_JT_ABI_MAJOR)
 #define bcos_abi_minor ((uint8_t (*)(void))BCOS_JT_ABI_MINOR)
 #define putstr         ((void (*)(const uint8_t*))BCOS_JT_PUTSTR)

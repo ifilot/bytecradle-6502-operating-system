@@ -1,4 +1,4 @@
-PROG = HELLOC.COM
+PROG = DIAG.COM
 
 all: $(PROG)
 

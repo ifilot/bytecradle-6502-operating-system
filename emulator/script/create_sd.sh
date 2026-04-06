@@ -113,6 +113,7 @@ make -C "$ROOT_DIR/programs"
 
 echo "Copying compiled programs..."
 mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/helloworld/HELLO.COM" ::/PROGRAMS/HELLO.COM
+mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/diag/DIAG.COM" ::/PROGRAMS/DIAG.COM
 mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/fibonacci/FIBO.COM" ::/PROGRAMS/FIBO.COM
 mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/monitor/monitor.bin" ::/PROGRAMS/MONITOR.COM
 mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/mandelbrot/MANDEL.COM" ::/PROGRAMS/MANDEL.COM

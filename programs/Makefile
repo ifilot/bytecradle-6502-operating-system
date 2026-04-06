@@ -1,6 +1,6 @@
 GEN := ../src/generate_bcos_artifacts.py
 
-SUBDIRS := helloworld hello-c fibonacci monitor mandelbrot
+SUBDIRS := helloworld diag fibonacci monitor mandelbrot
 
 .PHONY: all generate clean
 

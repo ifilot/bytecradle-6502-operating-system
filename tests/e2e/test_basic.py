@@ -37,7 +37,7 @@ def test_bcos_binary_boots_and_prints_startup(tmp_path: pathlib.Path) -> None:
             "--sdcard",
             str(fake_sd),
             "--clock",
-            "1.0",
+            "12.0",
         ]
     )
 

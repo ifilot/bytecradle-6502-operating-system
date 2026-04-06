@@ -1,16 +1,17 @@
 ; ---------------------------------------------------------------------------
 ; crt0.s
+; Shared C runtime entrypoint for BCOS user programs.
 ; ---------------------------------------------------------------------------
 
 .import __HEADER_LOAD__                     ; import start location
 
 .export   _init, _exit
-.import   _callmain, _charout
 
 .export   __STARTUP__ : absolute = 1        ; Mark as startup
 .import   __RAM_START__, __RAM_SIZE__       ; Linker generated
 
 .import    copydata, zerobss, initlib, donelib
+.import    _main, pusha0
 
 .include  "zeropage.inc"
 
@@ -43,20 +44,17 @@ _init:
           JSR     initlib              ; Run constructors
 
 ; ---------------------------------------------------------------------------
-; Call main()
+; Call main(argc, argv)
 ; ---------------------------------------------------------------------------
 
-          JSR     callmain
+          LDA     $0600                ; argc
+          JSR     pusha0               ; push argc (16-bit) on cc65 stack
+          LDX     #$06                 ; argv high byte
+          LDA     #$01                 ; argv low byte
+          JSR     _main
 
 ; ---------------------------------------------------------------------------
-; call main(argc, argv) through C helper
-; ---------------------------------------------------------------------------
-
-callmain:  JSR     _callmain
-          RTS
-
-; ---------------------------------------------------------------------------
-; Back from main (this is also the _exit entry):  force a software break
+; Back from main (this is also the _exit entry)
 ; ---------------------------------------------------------------------------
 
 _exit:    JSR     donelib              ; Run destructors

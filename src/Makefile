@@ -6,8 +6,8 @@ LD := ld65
 CC := cc65
 AR := ar65
 
-EMU := ../../../emulator/build/bc6502emu
-SDCARD := ../../../emulator/script/sdcard.img
+EMU := ../emulator/build/bc6502emu
+SDCARD := ../emulator/script/sdcard.img
 GEN := generate_bcos_artifacts.py
 
 # directories

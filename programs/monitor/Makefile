@@ -1,4 +1,4 @@
-GEN_BCOS := ../../src/os/bcos/generate_bcos_artifacts.py
+GEN_BCOS := ../../src/generate_bcos_artifacts.py
 GEN_MON := generate_monitor_jumptable.py
 
 PROGNAME = monitor

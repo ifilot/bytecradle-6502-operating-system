@@ -1,4 +1,4 @@
-GEN := ../src/os/bcos/generate_bcos_artifacts.py
+GEN := ../src/generate_bcos_artifacts.py
 
 SUBDIRS := helloworld hello-c fibonacci monitor mandelbrot
 

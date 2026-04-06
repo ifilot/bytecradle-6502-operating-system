@@ -6,7 +6,7 @@ import re
 
 ROOT = Path(__file__).resolve().parents[2]
 MON_DIR = ROOT / "programs/monitor"
-BCOS_INC = ROOT / "src/os/bcos/jumptable.inc"
+BCOS_INC = ROOT / "src/jumptable.inc"
 
 EXPORTS = ["putstr", "putstrnl", "putch", "newline", "puthex", "putdec", "getch"]
 

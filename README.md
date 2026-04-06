@@ -9,7 +9,11 @@ This repository contains the **software stack** for the ByteCradle 6502 platform
 - firmware/environment ROMs
 - sample user programs
 
-> This repository no longer contains hardware design files.
+![screenshot of the ByteCradle 6502 emulator](img/screenshot-emulator.png)
+
+> [!NOTE]
+> This repository only contains the operating system implementation. For the
+> hardware, please [see this repository](https://github.com/ifilot/bytecradle-6502).
 
 ## Repository layout
 

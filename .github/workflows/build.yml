@@ -16,7 +16,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y build-essential cmake make python3 cc65
+          sudo apt-get install -y build-essential cmake make python3 python3-pytest cc65
 
       - name: Build emulator
         run: |
@@ -28,3 +28,6 @@ jobs:
 
       - name: Build programs
         run: make -C programs
+
+      - name: Run end-to-end tests
+        run: pytest -q tests/e2e

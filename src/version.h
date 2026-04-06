@@ -18,84 +18,14 @@
  *                                                                        *
  **************************************************************************/
 
-#ifndef _COMMAND_H
-#define _COMMAND_H
+#ifndef _VERSION_H
+#define _VERSION_H
 
-#include "fs/fat32.h"
-#include "constants.h"
-#include "io.h"
+#define BCOS_VERSION "0.1.0"
 
-typedef struct {
-    const char *str;
-    void (*func)(void);
-} CommandEntry;
-
-/**
- * @brief Continuously sample keyboard input, retrieve and parse commands
- */
-void command_loop();
-
-/**
- * @brief Try to execute a command when user has pressed enter
- */
-void command_exec();
-
-/**
- * @brief Parse command buffer, splits using spaces
- */
-void command_parse();
-
-/**
- * @brief Execute the "ls" command
- */
-void command_ls();
-
-/**
- * @brief Execute the "cd" command
- */
-void command_cd();
-
-/**
- * @brief Performs a backspace operation on the command buffer
- */
-void command_backspace();
-
-/**
- * @brief Places the current working directory on the screen
- */
-void command_pwdcmd();
-
-/**
- * @brief Informs the user on an illegal command
- */
-void command_illegal();
-
-/**
- * @brief Outputs file to screen assuming human-readable content
- */
-void command_more();
-
-/**
- * @brief Try to launch a .COM file
- */
-uint8_t command_try_com();
-
-/**
- * @brief Dumps memory contents to screen
- * 
- */
-void command_hexdump();
-
-/**
- * @brief Outputs SD-CARD information to screen
- * 
- */
-void command_sdinfo();
-
-/**
- * @brief Outputs operating system version information
- *
- */
-void command_version();
+const char* version_get_string(void);
+const char* version_get_build_date(void);
+const char* version_get_build_time(void);
+void version_print(void);
 
 #endif

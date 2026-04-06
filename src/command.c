@@ -19,6 +19,7 @@
  **************************************************************************/
 
 #include "command.h"
+#include "version.h"
 
 static char command_buffer[40];
 static char* command_argv[20];
@@ -32,6 +33,7 @@ static const CommandEntry command_table[] = {
     { "MORE", command_more },
     { "HEXDUMP", command_hexdump },
     { "SDINFO", command_sdinfo },
+    { "VERSION", command_version },
 };
 
 /**
@@ -399,4 +401,12 @@ void command_hexdump() {
  */
 void command_sdinfo() {
     fs_print_partition_info();
+}
+
+/**
+ * @brief Outputs operating system version information
+ *
+ */
+void command_version() {
+    version_print();
 }

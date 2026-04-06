@@ -26,9 +26,11 @@
 #include "io.h"
 #include "ramtest.h"
 #include "command.h"
+#include "version.h"
 
 int main(void) {
     putstrnl("Starting system.");
+    version_print();
     putstr("Clearing user space...   ");
     memset((void*)0x0800, 0xFF, 0x7700);
     putstrnl("[OK]");

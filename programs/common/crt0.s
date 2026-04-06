@@ -14,12 +14,17 @@
 .import    _main, pusha0
 
 .include  "zeropage.inc"
+.include "../../src/jumptable.inc"
 
 ; ---------------------------------------------------------------------------
 
 .segment "HEADER"
 
 .word __HEADER_LOAD__
+.word $0000
+.byte BCOS_ABI_MAJOR
+.byte BCOS_ABI_MINOR
+.word $0000
 
 ; ---------------------------------------------------------------------------
 

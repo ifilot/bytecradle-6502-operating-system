@@ -35,6 +35,14 @@ jobs:
       - name: Build BCOS
         run: make -C src
 
+      - name: Generate BCOS ROM usage report
+        run: |
+          python3 scripts/inspect_bcos_size.py \
+            --map src/bin/sbc.map \
+            --bin src/bin/bcos.bin \
+            --out artifacts/bcos_size_report.md
+          cat artifacts/bcos_size_report.md >> "$GITHUB_STEP_SUMMARY"
+
       - name: Build programs
         run: make -C programs
 
@@ -43,3 +51,9 @@ jobs:
 
       - name: Run end-to-end tests
         run: pytest -q tests/e2e
+
+      - name: Upload BCOS size report artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: bcos-size-report
+          path: artifacts/bcos_size_report.md

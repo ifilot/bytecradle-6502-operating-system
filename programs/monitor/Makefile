@@ -1,5 +1,8 @@
 GEN_BCOS := ../../src/generate_bcos_artifacts.py
 GEN_MON := generate_monitor_jumptable.py
+PATCH := ../common/patch_com_header.py
+ABI_MAJOR := 1
+ABI_MINOR := 0
 
 PROGNAME = monitor
 
@@ -29,6 +32,7 @@ $(OBJS): | generate
 
 $(PROGNAME).bin: $(OBJS) rom.cfg
 	$(LD) -o $(PROGNAME).bin $(OBJS) -C rom.cfg
+	python3 $(PATCH) $(PROGNAME).bin --abi-major $(ABI_MAJOR) --abi-minor $(ABI_MINOR)
 
 run: $(PROGNAME).bin
 	../../emulator/build/bc6502emu \

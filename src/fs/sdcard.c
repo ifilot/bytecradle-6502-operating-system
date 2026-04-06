@@ -6,6 +6,8 @@
 
 static uint8_t fs_boot_sd(void);
 static uint8_t fs_read_sector(uint32_t addr);
+static uint8_t fs_prompt_ignore_crc(void);
+static uint8_t sdcard_ignore_crc = 0;
 
 /**
  * @brief Switch to the filesystem ROM bank and return previous bank.
@@ -56,6 +58,10 @@ uint8_t read_sector(uint32_t addr) {
     uint8_t ret = fs_read_sector(addr);
     fs_bank_exit(prev);
     return ret;
+}
+
+void sdcard_set_ignore_crc(uint8_t enabled) {
+    sdcard_ignore_crc = enabled ? 1 : 0;
 }
 
 #pragma code-name(push, "B2CODE")
@@ -130,16 +136,38 @@ static uint8_t fs_read_sector(uint32_t addr) {
 
     if(checksum == crc16) {
         return 0;
-    } else {
-        putstrnl("[ERROR] SD-CARD checksum error: HALTING");
-        puthex(checksum >> 8);
-        puthex(checksum);
-        putch(' ');
-        puthex(crc16 >> 8);
-        puthex(crc16);
-        putcrlf();
-        asm("loop: jmp loop");
     }
+
+    putstr("[ERROR] SD CRC mismatch: expected ");
+    puthex(checksum >> 8);
+    puthex(checksum);
+    putstr(" got ");
+    puthex(crc16 >> 8);
+    puthex(crc16);
+    putcrlf();
+
+    if(sdcard_ignore_crc || fs_prompt_ignore_crc()) {
+        putstrnl("WARNING: Continuing with CRC checks disabled.");
+        sdcard_ignore_crc = 1;
+        return 0;
+    }
+
+    return 0xFF;
+}
+
+static uint8_t fs_prompt_ignore_crc(void) {
+    uint8_t c = 0;
+
+    putstrnl("Ignore CRC mismatch and continue? (Y/N)");
+    do {
+        c = getch();
+        if(c == 'y' || c == 'Y') {
+            return 1;
+        }
+        if(c == 'n' || c == 'N') {
+            return 0;
+        }
+    } while(1);
 }
 
 #pragma rodata-name(pop)

@@ -6,6 +6,7 @@
 .include "functions.inc"
 .include "disassemble.inc"
 .include "assemble.inc"
+.include "../../src/jumptable.inc"
 
 .import __HEADER_LOAD__             ; will be grabbed from the .cfg file
 .export clearcmdbuf
@@ -17,6 +18,10 @@
 .segment "HEADER"
 
 .word __HEADER_LOAD__               ; program location
+.word $0000                         ; Payload length (patched post-link)
+.byte BCOS_ABI_MAJOR
+.byte BCOS_ABI_MINOR
+.word $0000                         ; CRC16 payload (patched post-link)
 
 .segment "STARTUP"
 ;-------------------------------------------------------------------------------

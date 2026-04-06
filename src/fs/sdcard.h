@@ -53,4 +53,11 @@ uint8_t read_sector(uint32_t addr);
  */
 uint8_t boot_sd(void);
 
+/**
+ * @brief Configure whether SD CRC mismatches should be ignored.
+ *
+ * @param enabled 0 to enforce CRC, non-zero to ignore CRC mismatch.
+ */
+void sdcard_set_ignore_crc(uint8_t enabled);
+
 #endif

@@ -8,6 +8,7 @@
 .PSC02                              ; Assembly for the 65C02 CPU
 
 .import __HEADER_LOAD__             ; Provided by the linker (.cfg) as load address
+.include "../../src/jumptable.inc"
 
 .define PUTSTRNL $FFE8              ; Routine to print a null-terminated string with newline
 
@@ -16,6 +17,10 @@
 ;------------------------------------------------------------------------------
 .segment "HEADER"
 .word __HEADER_LOAD__               ; Deployment address (typically $0800), little-endian
+.word $0000                         ; Payload length (patched post-link)
+.byte BCOS_ABI_MAJOR                ; Required ABI major
+.byte BCOS_ABI_MINOR                ; Required ABI minor
+.word $0000                         ; CRC16 payload (patched post-link)
 
 ;------------------------------------------------------------------------------
 ; Main Code Segment

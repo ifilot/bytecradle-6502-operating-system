@@ -21,11 +21,13 @@ struct FSOpenFile {
     uint32_t offset;
     uint32_t clusters[F32_LLSZ];
     uint8_t cluster_count;
+    uint8_t cluster_overflow;
 };
 
 static struct FSOpenFile fs_open_files[FS_MAX_OPEN_FILES];
 static uint8_t fs_dir_sorted = 0;
 static uint8_t fs_dir_overflow = 0;
+static uint8_t fat32_chain_overflow = 0;
 
 static uint8_t fs_mount_impl(void);
 static uint8_t fs_chdir_impl(const char* path);
@@ -38,14 +40,15 @@ static void fs_close_impl(fs_fd_t fd);
 static void fs_print_partition_info_impl(void);
 
 static uint8_t fs_fat32_read_mbr(void);
-static void fs_fat32_read_partition(void);
+static uint8_t fs_fat32_read_partition(void);
 static void fs_fat32_print_partition_info(void);
-static void fs_fat32_read_dir(void);
+static uint8_t fs_fat32_read_dir(void);
 static void fs_fat32_sort_files(void);
 static void fs_fat32_list_dir(void);
+static uint8_t fs_fat32_wait_for_listing_keypress(void);
 static struct FAT32File* fs_fat32_search_dir(const char* filename, uint8_t entry_type);
-static void fs_fat32_load_file(const struct FAT32File* fileptr, uint8_t* location);
-static void fs_fat32_build_linked_list(uint32_t nextcluster);
+static uint8_t fs_fat32_load_file(const struct FAT32File* fileptr, uint8_t* location);
+static uint8_t fs_fat32_build_linked_list(uint32_t nextcluster);
 static uint32_t fs_fat32_grab_cluster_address_from_fileblock(uint8_t *loc);
 static uint32_t fs_fat32_calculate_sector_address(uint32_t cluster, uint8_t sector);
 static int fs_fat32_file_compare(const void* item1, const void *item2);
@@ -196,6 +199,7 @@ void fs_print_partition_info(void) {
  */
 static uint8_t fs_make_83_filename(const char* filename, char* out) {
     const char *dot;
+    const char *p;
     uint8_t i = 0;
     uint8_t j = 0;
 
@@ -203,8 +207,25 @@ static uint8_t fs_make_83_filename(const char* filename, char* out) {
         return 0xFF;
     }
 
-    memset(out, ' ', 11);
     dot = strchr(filename, '.');
+    if(dot != NULL && strchr(dot + 1, '.') != NULL) {
+        return 0xFF;
+    }
+
+    for(p = filename; *p != '\0'; p++) {
+        char c = *p;
+        if(c == '.') {
+            continue;
+        }
+        if(!((c >= '0' && c <= '9') ||
+             (c >= 'A' && c <= 'Z') ||
+             (c >= 'a' && c <= 'z') ||
+             c == '_' || c == '-' || c == '$' || c == '~')) {
+            return 0xFF;
+        }
+    }
+
+    memset(out, ' ', 11);
 
     while(filename[i] != '\0' && filename[i] != '.' && i < 8) {
         char c = filename[i];
@@ -213,6 +234,9 @@ static uint8_t fs_make_83_filename(const char* filename, char* out) {
         }
         out[i] = c;
         i++;
+    }
+    if(filename[i] != '\0' && filename[i] != '.') {
+        return 0xFF;
     }
 
     if(dot != NULL) {
@@ -224,6 +248,9 @@ static uint8_t fs_make_83_filename(const char* filename, char* out) {
             }
             out[8 + j] = c;
             j++;
+        }
+        if(dot[j] != '\0') {
+            return 0xFF;
         }
     }
 
@@ -243,8 +270,11 @@ static uint8_t fs_build_cluster_cache(struct FSOpenFile* handle) {
         return 0xFF;
     }
 
-    fs_fat32_build_linked_list(handle->file.cluster);
+    if(fs_fat32_build_linked_list(handle->file.cluster) != 0x00) {
+        return 0xFF;
+    }
     handle->cluster_count = 0;
+    handle->cluster_overflow = fat32_chain_overflow;
     for(i=0; i<F32_LLSZ; i++) {
         if(fat32_linkedlist[i] == 0xFFFFFFFF) {
             break;
@@ -264,6 +294,8 @@ static uint8_t fs_build_cluster_cache(struct FSOpenFile* handle) {
 static uint8_t fs_mount_impl(void) {
     uint8_t i;
 
+    memset(fs_open_files, 0x00, sizeof(fs_open_files));
+
     for(i=0; i<FS_SD_BOOT_RETRIES; i++) {
         if(boot_sd() == 0x00) {
             break;
@@ -278,8 +310,10 @@ static uint8_t fs_mount_impl(void) {
         return 0xFF;
     }
 
-    fs_fat32_read_partition();
-    memset(fs_open_files, 0x00, sizeof(fs_open_files));
+    if(fs_fat32_read_partition() != 0x00) {
+        return 0xFF;
+    }
+
     return 0;
 }
 
@@ -316,7 +350,9 @@ static uint8_t fs_chdir_impl(const char* path) {
     }
     dirname[11] = 0x00;
 
-    fs_fat32_read_dir();
+    if(fs_fat32_read_dir() != 0x00) {
+        return 0xFF;
+    }
     res = fs_fat32_search_dir(dirname, FOLDER_ENTRY);
     if(res == NULL) {
         return 0xFF;
@@ -344,7 +380,9 @@ static uint8_t fs_chdir_impl(const char* path) {
  * @return 0 on success.
  */
 static uint8_t fs_list_dir_impl(void) {
-    fs_fat32_read_dir();
+    if(fs_fat32_read_dir() != 0x00) {
+        return 0xFF;
+    }
     fs_fat32_sort_files();
     fs_fat32_list_dir();
     if(fs_dir_overflow) {
@@ -414,7 +452,9 @@ static uint8_t fs_load_file_impl(const char* filename, uint8_t* location, uint32
     }
     filename83[11] = 0x00;
 
-    fs_fat32_read_dir();
+    if(fs_fat32_read_dir() != 0x00) {
+        return 0xFF;
+    }
     res = fs_fat32_search_dir(filename83, FILE_ENTRY);
     if(res == NULL) {
         return 0xFF;
@@ -424,7 +464,9 @@ static uint8_t fs_load_file_impl(const char* filename, uint8_t* location, uint32
         return 0xFF;
     }
 
-    fs_fat32_load_file(res, location);
+    if(fs_fat32_load_file(res, location) != 0x00) {
+        return 0xFF;
+    }
     if(filesize_out != NULL) {
         *filesize_out = res->filesize;
     }
@@ -451,7 +493,9 @@ static fs_fd_t fs_open_impl(const char* filename) {
     }
     filename83[11] = 0x00;
 
-    fs_fat32_read_dir();
+    if(fs_fat32_read_dir() != 0x00) {
+        return -1;
+    }
     res = fs_fat32_search_dir(filename83, FILE_ENTRY);
     if(res == NULL) {
         return -1;
@@ -501,6 +545,9 @@ static uint16_t fs_read_impl(fs_fd_t fd, uint8_t* dst, uint16_t len) {
 
     handle = &fs_open_files[fd];
     if(!handle->in_use) {
+        return 0;
+    }
+    if(handle->cluster_overflow) {
         return 0;
     }
 
@@ -554,6 +601,7 @@ static void fs_close_impl(fs_fd_t fd) {
     fs_open_files[fd].in_use = 0;
     fs_open_files[fd].offset = 0;
     fs_open_files[fd].cluster_count = 0;
+    fs_open_files[fd].cluster_overflow = 0;
 }
 
 /**
@@ -568,14 +616,14 @@ static void fs_print_partition_info_impl(void) {
  * has already been initialized.
  */
 static uint8_t fs_fat32_read_mbr(void) {
-    uint16_t checksum_sd = 0x0000;
-    uint16_t checksum = 0x0000;
     uint8_t* sdbuf = (uint8_t*)(SDBUF);
 
-    read_sector(0x00000000);
+    if(read_sector(0x00000000) != 0x00) {
+        return 0xFF;
+    }
 
     // check partition type
-    if(sdbuf[0x1C2] != 0x0C) {
+    if(sdbuf[0x1C2] != 0x0C && sdbuf[0x1C2] != 0x0B) {
         return -1;
     }
 
@@ -593,12 +641,14 @@ static uint8_t fs_fat32_read_mbr(void) {
  * This function assumes that the MBR has already been read and it present
  * in RAM at location 0x8000
  */
-static void fs_fat32_read_partition(void) {
+static uint8_t fs_fat32_read_partition(void) {
     // extract logical block address (LBA) from partition table
     uint32_t lba = *(uint32_t*)(SDBUF + 0x1C6);
 
     // retrieve the partition table
-    read_sector(lba);
+    if(read_sector(lba) != 0x00) {
+        return 0xFF;
+    }
 
     // store partition information
     fat32_partition.bytes_per_sector = *(uint16_t*)(SDBUF + 0x0B);
@@ -612,6 +662,20 @@ static void fs_fat32_read_partition(void) {
         (fat32_partition.number_of_fats * fat32_partition.sectors_per_fat);
     fat32_partition.lba_addr_root_dir = fs_fat32_calculate_sector_address(fat32_partition.root_dir_first_cluster, 0);
 
+    if(fat32_partition.bytes_per_sector != 512) {
+        return 0xFF;
+    }
+    if(fat32_partition.sectors_per_cluster == 0 ||
+       (fat32_partition.sectors_per_cluster & (fat32_partition.sectors_per_cluster - 1)) != 0) {
+        return 0xFF;
+    }
+    if(fat32_partition.number_of_fats == 0 || fat32_partition.sectors_per_fat == 0) {
+        return 0xFF;
+    }
+    if(fat32_partition.root_dir_first_cluster < 2) {
+        return 0xFF;
+    }
+
     // set the cluster of the current folder
     fat32_current_folder.cluster = fat32_partition.root_dir_first_cluster;
     fat32_current_folder.nrfiles = 0;
@@ -621,10 +685,13 @@ static void fs_fat32_read_partition(void) {
     fat32_pathdepth = 1;
 
     // read first sector of first partition to establish volume name
-    read_sector(fat32_partition.lba_addr_root_dir);
+    if(read_sector(fat32_partition.lba_addr_root_dir) != 0x00) {
+        return 0xFF;
+    }
 
     // copy volume name
     memcpy(fat32_partition.volume_label, (uint8_t*)(SDBUF), 11);
+    return 0;
 }
 
 /**
@@ -667,7 +734,7 @@ static void fs_fat32_print_partition_info() {
  * Read the contents of the current directory, store the result starting
  * at 0x8200.
  */
-static void fs_fat32_read_dir() {
+static uint8_t fs_fat32_read_dir() {
     uint8_t ctr = 0;                // counter over clusters
     uint16_t fctr = 0;              // counter over directory entries (files and folders)
     uint8_t i = 0, j = 0;
@@ -678,7 +745,9 @@ static void fs_fat32_read_dir() {
     fs_dir_overflow = 0;
 
     // build linked list
-    fs_fat32_build_linked_list(fat32_current_folder.cluster);
+    if(fs_fat32_build_linked_list(fat32_current_folder.cluster) != 0x00) {
+        return 0xFF;
+    }
 
     while(fat32_linkedlist[ctr] != 0xFFFFFFFF && ctr < F32_LLSZ) {
         // print cluster number and address
@@ -686,7 +755,9 @@ static void fs_fat32_read_dir() {
 
         // loop over all sectors per cluster
         for(i=0; i<fat32_partition.sectors_per_cluster; i++) {
-            read_sector(caddr);            // read sector data
+            if(read_sector(caddr) != 0x00) {
+                return 0xFF;
+            }
             locptr = (uint8_t*)(SDBUF);    // set pointer to sector data
             for(j=0; j<16; j++) { // 16 file tables per sector
                 // continue if an unused entry is encountered 0xE5
@@ -697,14 +768,24 @@ static void fs_fat32_read_dir() {
 
                 // early exit if a zero is read
                 if(*locptr == 0x00) {
-                    file = &fat32_files[fctr];
                     fat32_current_folder.nrfiles = fctr;
-                    return;
+                    return 0;
+                }
+
+                // skip long-file-name entries
+                if((*(locptr + 0x0B) & 0x0F) == 0x0F) {
+                    locptr += 32;  // next file entry location
+                    continue;
                 }
 
                 // check if we are reading a file or a folder
-                if((*(locptr + 0x0B) & 0x0F) == 0x00) {
-
+                if((*(locptr + 0x0B) & 0x08) == 0x00) {
+                    if(fctr >= MAXFILES) {
+                        fs_dir_overflow = 1;
+                        putstrnl("Error: too many entries in folder; cannot parse...");
+                        fat32_current_folder.nrfiles = fctr;
+                        return 0xFF;
+                    }
                     file = &fat32_files[fctr];
                     memcpy(file->basename, locptr, 11);
                     file->termbyte = 0x00;  // by definition
@@ -712,13 +793,6 @@ static void fs_fat32_read_dir() {
                     file->cluster = fs_fat32_grab_cluster_address_from_fileblock(locptr);
                     file->filesize = *(uint32_t*)(locptr + 0x1C);
                     fctr++;
-
-                    if(fctr >= MAXFILES) {
-                        fs_dir_overflow = 1;
-                        putstrnl("Error: too many entries in folder; cannot parse...");
-                        fat32_current_folder.nrfiles = fctr;
-                        return;
-                    }
                 }
                 locptr += 32;  // next file entry location
             }
@@ -727,6 +801,7 @@ static void fs_fat32_read_dir() {
         ctr++;  // next cluster
     }
     fat32_current_folder.nrfiles = fctr;
+    return fat32_chain_overflow ? 0xFF : 0;
 }
 
 /**
@@ -744,15 +819,45 @@ static void fs_fat32_list_dir() {
     uint16_t i = 0;
     uint8_t buf[80];
     struct FAT32File *file = fat32_files;
+    uint8_t lines_printed = 0;
+    uint16_t nr_files = 0;
+    uint32_t total_size = 0;
+
     for(i = 0; i<fat32_current_folder.nrfiles; i++) {
         if(file->attrib & MASK_DIR) {
             sprintf(buf, "%.8s %.3s %08lX DIR", file->basename, file->extension, file->cluster);
         } else {
             sprintf(buf, "%.8s.%.3s %08lX %lu", file->basename, file->extension, file->cluster, file->filesize);
+            nr_files++;
+            total_size += file->filesize;
         }
         putstrnl(buf);
+        lines_printed++;
+        if(lines_printed >= 24) {
+            putstrnl("--- Press any key for next page, Q to quit ---");
+            if(fs_fat32_wait_for_listing_keypress() != 0) {
+                return;
+            }
+            lines_printed = 0;
+        }
         file++;
     }
+
+    sprintf(buf, "%u File(s) %lu bytes", nr_files, total_size);
+    putstrnl(buf);
+}
+
+/**
+ * Wait for a keypress while listing files.
+ * Returns 1 when the user requested to quit.
+ */
+static uint8_t fs_fat32_wait_for_listing_keypress() {
+    uint8_t c;
+    do {
+        c = getch();
+    } while(c == 0);
+
+    return (uint8_t)(c == 'q' || c == 'Q');
 }
 
 /**
@@ -794,20 +899,27 @@ static uint32_t fs_fat32_calculate_sector_address(uint32_t cluster, uint8_t sect
 /**
  * Load a file to location in RAM
  */
-static void fs_fat32_load_file(const struct FAT32File* fileptr, uint8_t* location) {
+static uint8_t fs_fat32_load_file(const struct FAT32File* fileptr, uint8_t* location) {
     uint32_t* addr = fat32_linkedlist;
     uint32_t caddr;
     uint32_t nbytes = 0;
     uint8_t i=0;
 
     if(fileptr->filesize < 0x7500) { // 29 KiB
-        fs_fat32_build_linked_list(fileptr->cluster);
+        if(fs_fat32_build_linked_list(fileptr->cluster) != 0x00) {
+            return 0xFF;
+        }
+        if(fat32_chain_overflow) {
+            return 0xFF;
+        }
 
-        while(*addr != 0x0FFFFFFF && nbytes < fileptr->filesize) {
+        while(*addr != 0xFFFFFFFF && nbytes < fileptr->filesize) {
             caddr = fs_fat32_calculate_sector_address(*(addr++), 0);
 
             for(i=0; i<fat32_partition.sectors_per_cluster; i++) {
-                read_sector(caddr);
+                if(read_sector(caddr) != 0x00) {
+                    return 0xFF;
+                }
                 caddr++;
                 memcpy(location, (uint8_t*)SDBUF, 0x200);
                 location += 0x200;
@@ -819,6 +931,7 @@ static void fs_fat32_load_file(const struct FAT32File* fileptr, uint8_t* locatio
             }
         }
     }
+    return 0;
 }
 
 /**
@@ -826,22 +939,31 @@ static void fs_fat32_load_file(const struct FAT32File* fileptr, uint8_t* locatio
  * 
  * @param nextcluster first cluster in the linked list
  */
-static void fs_fat32_build_linked_list(uint32_t nextcluster) {
+static uint8_t fs_fat32_build_linked_list(uint32_t nextcluster) {
     // counter over clusters
     uint8_t ctr = 0;
     uint8_t item = 0;
 
     // clear previous linked list
     memset(fat32_linkedlist, 0xFF, F32_LLSZ * sizeof(uint32_t));
+    fat32_chain_overflow = 0;
 
     // try grabbing next cluster
     while(nextcluster < 0x0FFFFFF8 && nextcluster != 0 && ctr < F32_LLSZ) {
         fat32_linkedlist[ctr] = nextcluster;
-        read_sector(fat32_partition.fat_begin_lba + (nextcluster >> 7));
+        if(read_sector(fat32_partition.fat_begin_lba + (nextcluster >> 7)) != 0x00) {
+            return 0xFF;
+        }
         item = nextcluster & 0b01111111;
         nextcluster = *(uint32_t*)(SDBUF + item * 4);
         ctr++;
     }
+
+    if(nextcluster < 0x0FFFFFF8 && nextcluster != 0 && ctr >= F32_LLSZ) {
+        fat32_chain_overflow = 1;
+    }
+
+    return 0;
 }
 
 /**

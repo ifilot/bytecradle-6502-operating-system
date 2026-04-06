@@ -20,6 +20,7 @@
 
 #include "command.h"
 #include "version.h"
+#include "crc16.h"
 
 static char command_buffer[40];
 static char* command_argv[20];
@@ -27,10 +28,28 @@ static uint8_t command_argc;
 static uint8_t command_parse_too_many_args;
 static char* command_ptr = command_buffer;
 
+/*
+ * Argument list (argv / argc) position
+ */
 #define BCOS_ARGC_ADDR       ((uint8_t*)0x0600)
 #define BCOS_ARGV_TABLE_ADDR ((char**)0x0601)
 #define BCOS_ARGV_STR_ADDR   ((char*)0x0630)
+#define BCOS_ARGV_STR_END    ((char*)0x067F)
 
+/**
+ * Header of .COM files
+ */
+typedef struct {
+    uint16_t load_addr;     // deployment address
+    uint16_t payload_len;   // program length (excluding header)
+    uint8_t abi_major;      // ABI major version (error on mismatch)
+    uint8_t abi_minor;      // ABI minor version (warning on mismatch)
+    uint16_t payload_crc;   // payload CRC16/XMODEM checksum
+} ComHeader;
+
+/*
+ * List of system commands
+ */
 static const CommandEntry command_table[] = {
     { "LS", command_ls },
     { "DIR", command_ls },
@@ -41,47 +60,8 @@ static const CommandEntry command_table[] = {
     { "VERSION", command_version },
 };
 
-/**
- * @brief Heuristic check for binary data in a text viewer.
- *
- * Rule of thumb:
- * - Immediate binary if NUL byte is present.
- * - Otherwise, if >10% of sampled bytes are unusual control characters,
- *   classify as binary.
- */
-static uint8_t command_is_probably_binary(const uint8_t *data, uint32_t size) {
-    uint32_t sample = size > 512 ? 512 : size;
-    uint32_t i;
-    uint16_t suspicious = 0;
-    uint8_t c;
-
-    for(i = 0; i < sample; i++) {
-        c = data[i];
-
-        if(c == 0x00) {
-            return 1;
-        }
-
-        if(c < 0x20 &&
-           c != '\t' &&
-           c != '\n' &&
-           c != '\r' &&
-           c != '\f' &&
-           c != 0x1B) {
-            suspicious++;
-        }
-
-        if(c == 0x7F) {
-            suspicious++;
-        }
-    }
-
-    if(sample == 0) {
-        return 0;
-    }
-
-    return (uint8_t)((uint32_t)suspicious * 10 > sample);
-}
+// forward declarations
+static uint8_t command_is_probably_binary(const uint8_t *data, uint32_t size);
 
 /**
  * @brief Continuously sample keyboard input, retrieve and parse commands
@@ -205,7 +185,20 @@ static void command_store_program_args() {
         argv[i] = strptr;
         j = 0;
         while(command_argv[i][j] != '\0') {
+            if(strptr >= BCOS_ARGV_STR_END) {
+                *(BCOS_ARGC_ADDR) = i;
+                *strptr = '\0';
+                argv[i] = NULL;
+                argv[i + 1] = NULL;
+                return;
+            }
             *(strptr++) = command_argv[i][j++];
+        }
+        if(strptr >= BCOS_ARGV_STR_END) {
+            *(BCOS_ARGC_ADDR) = i + 1;
+            *(BCOS_ARGV_STR_END) = '\0';
+            argv[i + 1] = NULL;
+            return;
         }
         *(strptr++) = '\0';
     }
@@ -361,9 +354,10 @@ uint8_t command_try_com() {
     fs_fd_t fd;
     char filename[16] = {0};
     uint8_t l = strlen(command_argv[0]);
-    uint16_t addr;
-    uint8_t hdr[2];
+    ComHeader hdr;
+    uint16_t calc_crc;
     uint32_t filesize = 0;
+    uint16_t payload_size;
     void __fastcall__ (*program)(void) = NULL;
 
     // ensure proper RAM bank
@@ -378,31 +372,65 @@ uint8_t command_try_com() {
     if(fd < 0) {
         return 0xFF;
     }
-    if(fs_read(fd, hdr, sizeof(hdr)) != sizeof(hdr)) {
+    if(fs_read(fd, (uint8_t*)&hdr, sizeof(hdr)) != sizeof(hdr)) {
         fs_close(fd);
         return 0xFF;
     }
     fs_close(fd);
 
-    addr = *(uint16_t*)hdr;
-
-    if(!(addr >= 0x0800 && addr < 0x7F00)) {
+    if(hdr.load_addr < 0x0800 || hdr.load_addr >= 0x7F00) {
         putstrnl("Invalid start address: file corrupt?");
         return 0xFF;
     }
 
-    if(fs_load_file(filename, (uint8_t*)addr, &filesize) != 0x00) {
+    if(hdr.payload_len == 0) {
+        putstrnl("Invalid payload length");
+        return 0xFF;
+    }
+
+    if(fs_load_file(filename, (uint8_t*)hdr.load_addr, &filesize) != 0x00) {
         putstrnl("Cannot load file");
         return 0xFF;
     }
-    if(addr + filesize >= 0x7F00) {
+
+    if(filesize < COM_HEADER_SIZE) {
+        putstrnl("Invalid COM header");
+        return 0xFF;
+    }
+
+    payload_size = (uint16_t)(filesize - COM_HEADER_SIZE);
+    if(hdr.payload_len != payload_size) {
+        putstrnl("Payload length mismatch");
+        return 0xFF;
+    }
+
+    if(((uint32_t)hdr.load_addr) + filesize >= 0x7F00) {
         putstrnl("File too large to fit in memory");
+        return 0xFF;
+    }
+
+    if(hdr.abi_major != BCOS_ABI_MAJOR) {
+        putstrnl("Incompatible ABI major version");
+        return 0xFF;
+    }
+
+    if(hdr.abi_minor != BCOS_ABI_MINOR) {
+        putstr("Warning: ABI minor mismatch. Program=");
+        puthex(hdr.abi_minor);
+        putstr(" OS=");
+        puthex(BCOS_ABI_MINOR);
+        putcrlf();
+    }
+
+    calc_crc = crc16_xmodem(((uint8_t*)hdr.load_addr) + COM_HEADER_SIZE, payload_size);
+    if(calc_crc != hdr.payload_crc) {
+        putstrnl("Payload checksum failed");
         return 0xFF;
     }
 
     command_store_program_args();
 
-    program = (void(*)(void))(addr+2);
+    program = (void(*)(void))(hdr.load_addr + COM_HEADER_SIZE);
     program();
     memset((void*)0x0800, 0xFF, 0x7700);    // clean up user space
     return 0;
@@ -461,4 +489,46 @@ void command_sdinfo() {
  */
 void command_version() {
     version_print();
+}
+
+/**
+ * @brief Heuristic check for binary data in a text viewer.
+ *
+ * Rule of thumb:
+ * - Immediate binary if NUL byte is present.
+ * - Otherwise, if >10% of sampled bytes are unusual control characters,
+ *   classify as binary.
+ */
+static uint8_t command_is_probably_binary(const uint8_t *data, uint32_t size) {
+    uint32_t sample = size > 512 ? 512 : size;
+    uint32_t i;
+    uint16_t suspicious = 0;
+    uint8_t c;
+
+    for(i = 0; i < sample; i++) {
+        c = data[i];
+
+        if(c == 0x00) {
+            return 1;
+        }
+
+        if(c < 0x20 &&
+           c != '\t' &&
+           c != '\n' &&
+           c != '\r' &&
+           c != '\f' &&
+           c != 0x1B) {
+            suspicious++;
+        }
+
+        if(c == 0x7F) {
+            suspicious++;
+        }
+    }
+
+    if(sample == 0) {
+        return 0;
+    }
+
+    return (uint8_t)((uint32_t)suspicious * 10 > sample);
 }

@@ -40,6 +40,7 @@ struct FAT32Partition {
     uint32_t sectors_per_fat;
     uint32_t root_dir_first_cluster;
     uint32_t fat_begin_lba;
+    uint32_t fat2_begin_lba;
     uint32_t lba_addr_root_dir;
     uint32_t sector_begin_lba;
     char volume_label[11];
@@ -86,6 +87,22 @@ uint8_t fs_mount(void);
  * @brief Print FAT32 partition metadata to the console.
  */
 void fs_print_partition_info(void);
+
+/**
+ * @brief Create a new child directory in the current folder.
+ *
+ * @param name folder name (8.3-compatible, no dot)
+ * @return 0 on success, 0xFF on error
+ */
+uint8_t fs_mkdir(const char* name);
+
+/**
+ * @brief Create an empty file entry in the current folder.
+ *
+ * @param filename file name (8.3-compatible)
+ * @return 0 on success, 0xFF on error
+ */
+uint8_t fs_touch(const char* filename);
 
 /**
  * @brief Change current working directory.

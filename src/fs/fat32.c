@@ -34,6 +34,8 @@ static uint8_t fs_chdir_impl(const char* path);
 static uint8_t fs_list_dir_impl(void);
 static uint8_t fs_getcwd_impl(char* out, uint8_t out_sz);
 static uint8_t fs_load_file_impl(const char* filename, uint8_t* location, uint32_t* filesize_out);
+static uint8_t fs_mkdir_impl(const char* name);
+static uint8_t fs_touch_impl(const char* filename);
 static fs_fd_t fs_open_impl(const char* filename);
 static uint16_t fs_read_impl(fs_fd_t fd, uint8_t* dst, uint16_t len);
 static void fs_close_impl(fs_fd_t fd);
@@ -52,6 +54,9 @@ static uint8_t fs_fat32_build_linked_list(uint32_t nextcluster);
 static uint32_t fs_fat32_grab_cluster_address_from_fileblock(uint8_t *loc);
 static uint32_t fs_fat32_calculate_sector_address(uint32_t cluster, uint8_t sector);
 static int fs_fat32_file_compare(const void* item1, const void *item2);
+static uint8_t fs_fat32_find_free_cluster(uint32_t* cluster_out);
+static uint8_t fs_fat32_set_fat_entry(uint32_t cluster, uint32_t value);
+static uint8_t fs_fat32_mirror_fat_sector(uint32_t fat_sector_lba);
 
 /**
  * @brief Switch to BANK2 and return previous ROM bank.
@@ -135,6 +140,32 @@ uint8_t fs_getcwd(char* out, uint8_t out_sz) {
 uint8_t fs_load_file(const char* filename, uint8_t* location, uint32_t* filesize_out) {
     uint8_t prev = fs_bank_enter();
     uint8_t ret = fs_load_file_impl(filename, location, filesize_out);
+    fs_bank_exit(prev);
+    return ret;
+}
+
+/**
+ * @brief Create child folder (public BANK2 wrapper).
+ *
+ * @param name Folder name (8.3 compatible, no extension).
+ * @return 0 on success, 0xFF on error.
+ */
+uint8_t fs_mkdir(const char* name) {
+    uint8_t prev = fs_bank_enter();
+    uint8_t ret = fs_mkdir_impl(name);
+    fs_bank_exit(prev);
+    return ret;
+}
+
+/**
+ * @brief Create empty file entry (public BANK2 wrapper).
+ *
+ * @param filename 8.3 filename.
+ * @return 0 on success, 0xFF on error.
+ */
+uint8_t fs_touch(const char* filename) {
+    uint8_t prev = fs_bank_enter();
+    uint8_t ret = fs_touch_impl(filename);
     fs_bank_exit(prev);
     return ret;
 }
@@ -473,6 +504,129 @@ static uint8_t fs_load_file_impl(const char* filename, uint8_t* location, uint32
     return 0;
 }
 
+
+/**
+ * @brief BANK2 implementation for mkdir.
+ */
+static uint8_t fs_mkdir_impl(const char* name) {
+    char name83[12];
+    uint32_t new_cluster;
+    uint32_t dir_lba;
+    uint8_t i;
+    uint8_t dir_slot = 0xFF;
+
+    if(name == NULL) {
+        return 0xFF;
+    }
+
+    if(fs_make_83_filename(name, name83) != 0x00) {
+        return 0xFF;
+    }
+    if(name83[8] != ' ') {
+        return 0xFF;
+    }
+    name83[11] = 0x00;
+
+    if(fs_fat32_find_free_cluster(&new_cluster) != 0x00) {
+        return 0xFF;
+    }
+    if(fs_fat32_set_fat_entry(new_cluster, 0x0FFFFFFF) != 0x00) {
+        return 0xFF;
+    }
+
+    for(i=0; i<fat32_partition.sectors_per_cluster; i++) {
+        memset((uint8_t*)SDBUF, 0x00, 512);
+        if(i == 0) {
+            memset((uint8_t*)SDBUF, ' ', 11);
+            *((uint8_t*)SDBUF) = '.';
+            *((uint8_t*)SDBUF + 0x0B) = MASK_DIR;
+            *(uint16_t*)(SDBUF + 0x14) = (uint16_t)(new_cluster >> 16);
+            *(uint16_t*)(SDBUF + 0x1A) = (uint16_t)(new_cluster & 0xFFFF);
+
+            memset((uint8_t*)SDBUF + 32, ' ', 11);
+            *((uint8_t*)SDBUF + 32) = '.';
+            *((uint8_t*)SDBUF + 33) = '.';
+            *((uint8_t*)SDBUF + 32 + 0x0B) = MASK_DIR;
+            *(uint16_t*)(SDBUF + 32 + 0x14) = (uint16_t)(fat32_current_folder.cluster >> 16);
+            *(uint16_t*)(SDBUF + 32 + 0x1A) = (uint16_t)(fat32_current_folder.cluster & 0xFFFF);
+        }
+        if(write_sector(fs_fat32_calculate_sector_address(new_cluster, i)) != 0x00) {
+            return 0xFF;
+        }
+    }
+
+    dir_lba = fs_fat32_calculate_sector_address(fat32_current_folder.cluster, 0);
+    if(read_sector(dir_lba) != 0x00) {
+        return 0xFF;
+    }
+    for(i=0; i<16; i++) {
+        uint8_t first = *((uint8_t*)SDBUF + ((uint16_t)i << 5));
+        if(first == 0x00 || first == 0xE5) {
+            dir_slot = i;
+            break;
+        }
+    }
+    if(dir_slot == 0xFF) {
+        return 0xFF;
+    }
+    memset((uint8_t*)SDBUF + ((uint16_t)dir_slot << 5), 0x00, 32);
+    memcpy((uint8_t*)SDBUF + ((uint16_t)dir_slot << 5), name83, 11);
+    *((uint8_t*)SDBUF + ((uint16_t)dir_slot << 5) + 0x0B) = MASK_DIR;
+    *(uint16_t*)(SDBUF + ((uint16_t)dir_slot << 5) + 0x14) = (uint16_t)(new_cluster >> 16);
+    *(uint16_t*)(SDBUF + ((uint16_t)dir_slot << 5) + 0x1A) = (uint16_t)(new_cluster & 0xFFFF);
+    if(write_sector(dir_lba) != 0x00) {
+        return 0xFF;
+    }
+
+    return 0;
+}
+
+/**
+ * @brief BANK2 implementation for touch.
+ */
+#pragma code-name(push, "CODE")
+#pragma rodata-name(push, "RODATA")
+static uint8_t fs_touch_impl(const char* filename) {
+    char name83[12];
+    uint32_t dir_lba;
+    uint8_t dir_slot = 0xFF;
+    uint8_t i;
+
+    if(filename == NULL) {
+        return 0xFF;
+    }
+
+    if(fs_make_83_filename(filename, name83) != 0x00) {
+        return 0xFF;
+    }
+    name83[11] = 0x00;
+
+    dir_lba = fs_fat32_calculate_sector_address(fat32_current_folder.cluster, 0);
+    if(read_sector(dir_lba) != 0x00) {
+        return 0xFF;
+    }
+    for(i=0; i<16; i++) {
+        uint8_t first = *((uint8_t*)SDBUF + ((uint16_t)i << 5));
+        if(first == 0x00 || first == 0xE5) {
+            dir_slot = i;
+            break;
+        }
+    }
+    if(dir_slot == 0xFF) {
+        return 0xFF;
+    }
+    memset((uint8_t*)SDBUF + ((uint16_t)dir_slot << 5), 0x00, 32);
+    memcpy((uint8_t*)SDBUF + ((uint16_t)dir_slot << 5), name83, 11);
+    *((uint8_t*)SDBUF + ((uint16_t)dir_slot << 5) + 0x0B) = 0x20;
+    if(write_sector(dir_lba) != 0x00) {
+        return 0xFF;
+    }
+
+    return 0;
+}
+#pragma rodata-name(pop)
+#pragma code-name(pop)
+
 /**
  * @brief BANK2 implementation for file-open.
  *
@@ -658,6 +812,7 @@ static uint8_t fs_fat32_read_partition(void) {
     fat32_partition.sectors_per_fat = *(uint32_t*)(SDBUF + 0x24);
     fat32_partition.root_dir_first_cluster = *(uint32_t*)(SDBUF + 0x2C);
     fat32_partition.fat_begin_lba = lba + fat32_partition.reserved_sectors;
+    fat32_partition.fat2_begin_lba = fat32_partition.fat_begin_lba + fat32_partition.sectors_per_fat;
     fat32_partition.sector_begin_lba = fat32_partition.fat_begin_lba + 
         (fat32_partition.number_of_fats * fat32_partition.sectors_per_fat);
     fat32_partition.lba_addr_root_dir = fs_fat32_calculate_sector_address(fat32_partition.root_dir_first_cluster, 0);
@@ -964,6 +1119,66 @@ static uint8_t fs_fat32_build_linked_list(uint32_t nextcluster) {
     }
 
     return 0;
+}
+
+/**
+ * @brief Mirror a written FAT sector to FAT#2.
+ */
+static uint8_t fs_fat32_mirror_fat_sector(uint32_t fat_sector_lba) {
+    return write_sector(fat32_partition.fat2_begin_lba + (fat_sector_lba - fat32_partition.fat_begin_lba));
+}
+
+/**
+ * @brief Set one FAT32 entry and mirror to FAT#2.
+ */
+static uint8_t fs_fat32_set_fat_entry(uint32_t cluster, uint32_t value) {
+    uint32_t fat_sector_lba = fat32_partition.fat_begin_lba + (cluster >> 7);
+    uint8_t item = cluster & 0x7F;
+
+    if(read_sector(fat_sector_lba) != 0x00) {
+        return 0xFF;
+    }
+    *(uint32_t*)(SDBUF + ((uint16_t)item << 2)) = (value & 0x0FFFFFFFUL);
+
+    if(write_sector(fat_sector_lba) != 0x00) {
+        return 0xFF;
+    }
+    if(fs_fat32_mirror_fat_sector(fat_sector_lba) != 0x00) {
+        return 0xFF;
+    }
+
+    return 0;
+}
+
+/**
+ * @brief Find first free FAT cluster.
+ */
+static uint8_t fs_fat32_find_free_cluster(uint32_t* cluster_out) {
+    uint8_t i;
+    uint32_t cluster;
+    uint32_t entry;
+
+    if(cluster_out == NULL) {
+        return 0xFF;
+    }
+
+    if(read_sector(fat32_partition.fat_begin_lba) != 0x00) {
+        return 0xFF;
+    }
+
+    for(i = 3; i < 128; i++) {
+        cluster = i;
+        if(cluster == fat32_partition.root_dir_first_cluster) {
+            continue;
+        }
+        entry = *(uint32_t*)(SDBUF + ((uint16_t)i << 2)) & 0x0FFFFFFF;
+        if(entry == 0) {
+            *cluster_out = cluster;
+            return 0;
+        }
+    }
+
+    return 0xFF;
 }
 
 /**

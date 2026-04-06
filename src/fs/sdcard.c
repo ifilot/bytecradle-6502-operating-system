@@ -6,6 +6,7 @@
 
 static uint8_t fs_boot_sd(void);
 static uint8_t fs_read_sector(uint32_t addr);
+static uint8_t fs_write_sector(uint32_t addr);
 static uint8_t fs_prompt_ignore_crc(void);
 static uint8_t sdcard_ignore_crc = 0;
 
@@ -56,6 +57,19 @@ uint8_t boot_sd(void) {
 uint8_t read_sector(uint32_t addr) {
     uint8_t prev = fs_bank_enter();
     uint8_t ret = fs_read_sector(addr);
+    fs_bank_exit(prev);
+    return ret;
+}
+
+/**
+ * @brief Write one 512-byte SD sector from SDBUF.
+ *
+ * @param addr Logical block address (sector).
+ * @return 0 on success; 0xFF on failure.
+ */
+uint8_t write_sector(uint32_t addr) {
+    uint8_t prev = fs_bank_enter();
+    uint8_t ret = fs_write_sector(addr);
     fs_bank_exit(prev);
     return ret;
 }
@@ -153,6 +167,16 @@ static uint8_t fs_read_sector(uint32_t addr) {
     }
 
     return 0xFF;
+}
+
+/**
+ * @brief Internal BANK2 sector write.
+ *
+ * @param addr Logical block address (sector).
+ * @return 0 on success.
+ */
+static uint8_t fs_write_sector(uint32_t addr) {
+    return sdcmd24(addr);
 }
 
 static uint8_t fs_prompt_ignore_crc(void) {

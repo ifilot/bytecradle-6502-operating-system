@@ -54,6 +54,8 @@ static const CommandEntry command_table[] = {
     { "LS", command_ls },
     { "DIR", command_ls },
     { "CD", command_cd },
+    { "MKDIR", command_mkdir },
+    { "TOUCH", command_touch },
     { "MORE", command_more },
     { "HEXDUMP", command_hexdump },
     { "SDINFO", command_sdinfo },
@@ -237,6 +239,40 @@ void command_cd() {
 
     if(fs_chdir(command_argv[1]) != 0x00) {
         putstrnl("Cannot find folder");
+    }
+}
+
+/**
+ * @brief Execute the "mkdir" command
+ */
+void command_mkdir() {
+    asm("lda #63");
+    asm("sta %w", RAMBANKREGISTER);
+
+    if(command_argc != 2) {
+        command_illegal();
+        return;
+    }
+
+    if(fs_mkdir(command_argv[1]) != 0x00) {
+        putstrnl("Cannot create folder");
+    }
+}
+
+/**
+ * @brief Execute the "touch" command
+ */
+void command_touch() {
+    asm("lda #63");
+    asm("sta %w", RAMBANKREGISTER);
+
+    if(command_argc != 2) {
+        command_illegal();
+        return;
+    }
+
+    if(fs_touch(command_argv[1]) != 0x00) {
+        putstrnl("Cannot create file");
     }
 }
 

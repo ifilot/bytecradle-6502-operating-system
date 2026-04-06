@@ -32,6 +32,7 @@ extern uint8_t __fastcall__ sdcmd08(uint8_t *resptr);
 extern uint8_t __fastcall__ sdacmd41(void);
 extern uint8_t __fastcall__ sdcmd58(uint8_t *resptr);
 extern uint16_t __cdecl__ sdcmd17(uint32_t addr);
+extern uint8_t __cdecl__ sdcmd24(uint32_t addr);
 
 /*
  * Note: public fs APIs are resident wrappers that switch ROM to BANK 2
@@ -45,6 +46,14 @@ extern uint16_t __cdecl__ sdcmd17(uint32_t addr);
  * @return 0 on success.
  */
 uint8_t read_sector(uint32_t addr);
+
+/**
+ * @brief Write one SD card sector from SDBUF.
+ *
+ * @param addr Logical block address (sector).
+ * @return 0 on success.
+ */
+uint8_t write_sector(uint32_t addr);
 
 /**
  * @brief Initialize and validate SD card state.

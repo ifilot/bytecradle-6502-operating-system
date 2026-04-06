@@ -13,6 +13,7 @@
 .export _sdacmd41
 .export _sdcmd58
 .export _sdcmd17
+.export _sdcmd24
 
 .import incsp4
 .import pushax
@@ -288,6 +289,106 @@ _sdcmd17:
     jsr incsp4
     ldx #$FF                        ; error
     lda #$FF                        ; error
+    rts
+
+;------------------------------------------------------------------------------
+; Write one sector from RAMBANK (SDBUF) using CMD24
+;
+; Input: 4-byte LBA argument on stack (cc65 __cdecl__)
+; Return: A=0x00 on success, 0xFF on error
+;------------------------------------------------------------------------------
+_sdcmd24:
+    ; ensure correct RAM bank is loaded
+    lda #63
+    sta RAMBANKREGISTER
+
+    ; build command in RAMBANK+$210..$215 to avoid clobbering payload
+    lda #(24|$40)
+    sta RAMBANK+$210
+
+    lda sp
+    sta BUF2
+    lda sp+1
+    sta BUF3
+
+    ldy #4
+    ldx #0
+@nextcmd24:
+    dey
+    inx
+    lda (BUF2),y
+    sta RAMBANK+$210,x
+    cpy #0
+    bne @nextcmd24
+
+    lda #$01
+    sta RAMBANK+$215
+
+    ; send CMD24
+    lda #<(RAMBANK+$210)
+    sta BUF2
+    lda #>(RAMBANK+$210)
+    sta BUF3
+    jsr sdopen
+    jsr sd_send_cmd
+    jsr sd_recv_byte
+    cmp #$00
+    bne @fail24
+
+    ; data token
+    lda #$FE
+    jsr spi_send
+
+    ; stream 512 bytes from RAMBANK (SDBUF)
+    lda #<RAMBANK
+    sta BUF2
+    lda #>RAMBANK
+    sta BUF3
+@write_loop:
+    lda (BUF2)
+    jsr spi_send
+    inc BUF2
+    bne @write_skiphb
+    inc BUF3
+@write_skiphb:
+    lda BUF3
+    cmp #(>RAMBANK+2)
+    bne @write_loop
+
+    ; dummy CRC
+    lda #$FF
+    jsr spi_send
+    jsr spi_send
+
+    ; data response token: low 5 bits must be 0b00101 (accepted)
+    ldy #$20
+@wait_resp24:
+    jsr spi_recv
+    cmp #$FF
+    bne @got_resp24
+    dey
+    bne @wait_resp24
+    jmp @fail24
+@got_resp24:
+    and #$1F
+    cmp #$05
+    bne @fail24
+
+    ; wait until card is no longer busy
+@wait_busy:
+    jsr spi_recv
+    cmp #$FF
+    bne @wait_busy
+
+    jsr sdclose
+    jsr incsp4
+    lda #$00
+    rts
+
+@fail24:
+    jsr sdclose
+    jsr incsp4
+    lda #$FF
     rts
 
 ;-------------------------------------------------------------------------------

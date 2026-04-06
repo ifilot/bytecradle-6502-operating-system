@@ -54,6 +54,8 @@ void command_ls();
  * @brief Execute the "cd" command
  */
 void command_cd();
+void command_mkdir();
+void command_touch();
 
 /**
  * @brief Performs a backspace operation on the command buffer

@@ -3,6 +3,10 @@
 .export _set_rambank
 .export get_rambank
 .export _get_rambank
+.export set_rombank
+.export _set_rombank
+.export get_rombank
+.export _get_rombank
 
 .export newline
 .export newcmdline
@@ -58,6 +62,26 @@ _set_rambank:
 get_rambank:
 _get_rambank:
     lda RAMBANKREGISTER
+    rts
+
+;-------------------------------------------------------------------------------
+; SET_ROMBANK routine
+;
+; Sets the rombank from A.
+;-------------------------------------------------------------------------------
+set_rombank:
+_set_rombank:
+    sta ROMBANKREGISTER
+    rts
+
+;-------------------------------------------------------------------------------
+; GET_ROMBANK routine
+;
+; Reads the rombank. Return value in A.
+;-------------------------------------------------------------------------------
+get_rombank:
+_get_rombank:
+    lda ROMBANKREGISTER
     rts
 
 ;-------------------------------------------------------------------------------

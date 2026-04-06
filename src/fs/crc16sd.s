@@ -3,6 +3,9 @@
 .export makecrctable
 .export _crc16_xmodem_sdsector
 
+.segment "CODE"
+
+
 ;-------------------------------------------------------------------------------
 ; Code inspired from:
 ; https://web.archive.org/web/20250323022422/https://6502.org/source/integers/crc.htm

@@ -127,26 +127,19 @@ void command_ls() {
     asm("lda #63");
     asm("sta %w", RAMBANKREGISTER);
     
-    fat32_read_dir();
-    fat32_sort_files();
-    fat32_list_dir();
+    fs_list_dir();
 }
 
 /**
  * @brief Execute the "cd" command
  */
 void command_cd() {
-    struct FAT32File* res = NULL;
-    char dirname[12];
-    uint8_t l = strlen(command_argv[1]);
-
     // ensure proper RAM bank
     asm("lda #63");
     asm("sta %w", RAMBANKREGISTER);
 
     if(command_argc == 1) {
-        fat32_current_folder = fat32_root_folder;
-        fat32_pathdepth = 1;
+        fs_chdir("/");
         return;
     }
 
@@ -155,31 +148,7 @@ void command_cd() {
         return;
     }
 
-    if(fat32_pathdepth > 1 && strcmp(command_argv[1], "..") == 0) {
-        fat32_pathdepth--;
-        fat32_current_folder = fat32_fullpath[fat32_pathdepth - 1];
-        return;
-    }
-
-    l = l > 11 ? 11 : l;
-    memcpy(dirname, command_argv[1], l);
-    memset(&dirname[l], ' ', 11-l);
-    dirname[11] = 0x00;
-
-    fat32_read_dir();
-    fat32_sort_files();
-    res = fat32_search_dir(dirname, FOLDER_ENTRY);
-
-    if(res != NULL) {
-        if(res->cluster == 0) {
-            fat32_current_folder = fat32_root_folder;
-            fat32_pathdepth = 1;
-        } else {
-            memcpy(fat32_current_folder.name, res->basename, 11);
-            fat32_current_folder.cluster = res->cluster;
-            fat32_fullpath[fat32_pathdepth++] = fat32_current_folder;
-        }
-    } else {
+    if(fs_chdir(command_argv[1]) != 0x00) {
         putstrnl("Cannot find folder");
     }
 }
@@ -189,27 +158,16 @@ void command_cd() {
  */
 void command_pwdcmd() {
     char buf[80];
-    char *ptr;
-    char *bufptr = buf;
-    uint8_t i = 0;
 
     // ensure proper RAM bank
     asm("lda #63");
     asm("sta %w", RAMBANKREGISTER);
 
-    *(bufptr++) = ':';
-    for(i=0; i<fat32_pathdepth; i++) {
-        ptr = fat32_fullpath[i].name;
-        while(*ptr != 0x00 && *ptr != ' ') {
-            *(bufptr++) = *(ptr++);
-        }
-        *(bufptr++) = '/';
+    if(fs_getcwd(buf, sizeof(buf)) == 0x00) {
+        putstr(buf);
+    } else {
+        putstr(":/> ");
     }
-    *(bufptr++) = '>';
-    *(bufptr++) = ' ';
-    *(bufptr++) = 0x00;
-
-    putstr(buf);
 }
 
 /**
@@ -224,12 +182,8 @@ void command_illegal() {
  * @brief Outputs file to screen assuming human-readable content
  */
 void command_more() {
-    struct FAT32File* res = NULL;
-    char base[9] = {0};
-    char ext[4] = {0};
-    char filename[12] = {0};
-    const char *ptr;
-    uint8_t pos;
+    const uint8_t *ptr;
+    uint32_t filesize = 0;
     uint8_t linecounter = 0;
     uint8_t charcounter = 0;
 
@@ -242,38 +196,12 @@ void command_more() {
         return;
     }
 
-    memset(base, ' ', 8);
-    memset(ext, ' ', 8);
-
-    ptr = strchr(command_argv[1], '.');
-    if(ptr) {
-        pos = ptr - command_argv[1];
-        memcpy(base, command_argv[1], pos > 8 ? 8 : pos);
-        memcpy(ext, &command_argv[1][pos+1], 3);
-    } else {
-        pos = strlen(command_argv[1]);
-        memcpy(base, command_argv[1], pos > 8 ? 8 : pos);
-    }
-
-    memcpy(filename, base, 8);
-    memcpy(&filename[8], ext, 3);
-    filename[11] = 0;
-
-    putstrnl(filename);
-
-    fat32_read_dir();
-    fat32_sort_files();
-    res = fat32_search_dir(filename, FILE_ENTRY);
-
-    // when nothing can be found
-    if(res == NULL) {
+    if(fs_load_file(command_argv[1], (uint8_t*)(0x1000), &filesize) != 0x00) {
         putstrnl("Cannot find file.");
         return;
     }
-
-    fat32_load_file(res, (uint8_t*)(0x1000));
     ptr = (uint8_t*)0x1000;
-    while(*ptr != 0x00) {
+    while(filesize-- > 0) {
         if(*ptr == '\n') {
             ptr++;
             putcrlf();
@@ -301,10 +229,12 @@ void command_more() {
  * @brief Try to launch a .COM file
  */
 uint8_t command_try_com() {
-    struct FAT32File* res = NULL;
-    char filename[12] = {0};
+    fs_fd_t fd;
+    char filename[16] = {0};
     uint8_t l = strlen(command_argv[0]);
     uint16_t addr;
+    uint8_t hdr[2];
+    uint32_t filesize = 0;
     void __fastcall__ (*program)(void) = NULL;
 
     // ensure proper RAM bank
@@ -312,39 +242,39 @@ uint8_t command_try_com() {
     asm("sta %w", RAMBANKREGISTER);
 
     l = l > 8 ? 8 : l;
-    memset(filename, ' ', 8);
     memcpy(filename, command_argv[0], l);
-    memcpy(&filename[8], "COM", 3);
-    filename[11] = 0;
+    memcpy(&filename[l], ".COM", 4);
 
-    fat32_read_dir();
-    fat32_sort_files();
-    res = fat32_search_dir(filename, FILE_ENTRY);
-
-    // when nothing can be found
-    if(res == NULL) {
+    fd = fs_open(filename);
+    if(fd < 0) {
         return 0xFF;
-    } else {
-        // store first block at 0x8000; we need the first two bytes
-        sdcmd17(fat32_calculate_sector_address(res->cluster, 0));
-        addr = *(uint16_t*)(0x8000);
-
-        if(!(addr >= 0x0800 && addr < 0x7F00)) {
-            putstrnl("Invalid start address: file corrupt?");
-            return 0xFF;
-        }
-
-        if(addr + res->filesize >= 0x7F00) {
-            putstrnl("File too large to fit in memory");
-            return 0xFF;
-        }
-
-        fat32_load_file(res, (uint8_t*)addr);
-        program = (void(*)(void))(addr+2);
-        program();
-        memset((void*)0x0800, 0xFF, 0x7700);    // clean up user space
-        return 0;
     }
+    if(fs_read(fd, hdr, sizeof(hdr)) != sizeof(hdr)) {
+        fs_close(fd);
+        return 0xFF;
+    }
+    fs_close(fd);
+
+    addr = *(uint16_t*)hdr;
+
+    if(!(addr >= 0x0800 && addr < 0x7F00)) {
+        putstrnl("Invalid start address: file corrupt?");
+        return 0xFF;
+    }
+
+    if(fs_load_file(filename, (uint8_t*)addr, &filesize) != 0x00) {
+        putstrnl("Cannot load file");
+        return 0xFF;
+    }
+    if(addr + filesize >= 0x7F00) {
+        putstrnl("File too large to fit in memory");
+        return 0xFF;
+    }
+
+    program = (void(*)(void))(addr+2);
+    program();
+    memset((void*)0x0800, 0xFF, 0x7700);    // clean up user space
+    return 0;
 }
 
 /**
@@ -352,7 +282,8 @@ uint8_t command_try_com() {
  * 
  */
 void command_hexdump() {
-    uint8_t* addr;
+    uint16_t addr;
+    uint32_t parsed_addr;
     uint16_t i=0;
     char* endptr;
 
@@ -362,20 +293,22 @@ void command_hexdump() {
     }
 
     // convert input to hex
-    addr = strtol(command_argv[1], &endptr, 16);
+    parsed_addr = strtoul(command_argv[1], &endptr, 16);
 
-    if(*endptr != '\0') {
+    if(*endptr != '\0' || parsed_addr > 0xFFFF) {
         putstr("Invalid address: ");
         putstrnl(command_argv[1]);
         return;
     }
+    addr = (uint16_t)parsed_addr;
 
     for(i=0; i<256; i++) {
         if(i % 16 == 0) {
             puthexword(addr);
             putstr(": ");
         }
-        puthex(*(uint8_t*)(addr++));
+        puthex(*(uint8_t*)addr);
+        addr++;
         putspace();
         if(i % 16 == 15) {
             putstrnl("");
@@ -388,5 +321,5 @@ void command_hexdump() {
  * 
  */
 void command_sdinfo() {
-    fat32_print_partition_info();
+    fs_print_partition_info();
 }

@@ -24,6 +24,8 @@
 // banking routines
 extern void __fastcall__ set_rambank(uint8_t c);
 extern uint8_t __fastcall__ get_rambank();
+extern void __fastcall__ set_rombank(uint8_t c);
+extern uint8_t __fastcall__ get_rombank();
 
 extern void __fastcall__ jump(uint8_t* c);
 extern void __fastcall__ putbackspace();

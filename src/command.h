@@ -21,7 +21,7 @@
 #ifndef _COMMAND_H
 #define _COMMAND_H
 
-#include "fat32.h"
+#include "fs/fat32.h"
 #include "constants.h"
 #include "io.h"
 

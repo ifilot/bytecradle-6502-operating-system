@@ -21,6 +21,7 @@
 #ifndef _FAT32_H
 #define _FAT32_H
 
+#include <stdint.h>
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -59,94 +60,92 @@ struct FAT32File {
     uint32_t filesize;
 };
 
+typedef int8_t fs_fd_t;
+
 #define MASK_DIR        (1 << 4)
 #define FILE_ENTRY      0
 #define FOLDER_ENTRY    1
-
-extern struct FAT32Partition fat32_partition;
-extern uint32_t fat32_linkedlist[F32_LLSZ];
-extern struct FAT32Folder fat32_current_folder;
-extern struct FAT32Folder fat32_root_folder;
-extern struct FAT32File *fat32_files;
-extern struct FAT32Folder *fat32_fullpath;
-extern uint8_t fat32_pathdepth;
 
 #define MAXFILES        255
 #define FAT32FILESLOC   (SDBUF + 0x300)
 #define FAT32FOLDERLOC  (FAT32FILESLOC + sizeof(struct FAT32File) * MAXFILES)
 
-/**
- * Read the Master Boot Record from the SD card
+/*
+ * Note: public fs APIs are resident wrappers that switch ROM to BANK 2
+ * for execution of SD/FAT logic, then restore the previous ROM bank.
  */
-uint8_t fat32_read_mbr(void);
 
 /**
- * Read the partition table from the MBR
- * 
- * This function assumes that the MBR has already been read and it present
- * in RAM at location 0x8000
+ * @brief Mount filesystem (boot SD, read MBR and partition metadata)
+ *
+ * @return 0 on success, 0xFF on error
  */
-void fat32_read_partition(void);
+uint8_t fs_mount(void);
 
 /**
- * Print partition info
+ * @brief Print FAT32 partition metadata to the console.
  */
-void fat32_print_partition_info();
+void fs_print_partition_info(void);
 
 /**
- * Read the contents of the current directory, store the result starting
- * at 0x8200.
+ * @brief Change current working directory.
+ *
+ * Supports "/", "..", and direct child folder names.
+ *
+ * @param path path argument
+ * @return 0 on success, 0xFF on error
  */
-void fat32_read_dir();
+uint8_t fs_chdir(const char* path);
 
 /**
- * Sort the files in the file list
+ * @brief List current working directory.
+ *
+ * @return 0 on success, 0xFF on error
  */
-void fat32_sort_files();
+uint8_t fs_list_dir(void);
 
 /**
- * List the contents of the current directory and print it to the screen. 
- * Ideally, this function is called *after* `fat32_sort_files()` to produce
- * a sorted list.
+ * @brief Retrieve current working directory into user buffer.
+ *
+ * @param out destination buffer
+ * @param out_sz destination buffer size
+ * @return 0 on success, 0xFF on overflow/error
  */
-void fat32_list_dir();
+uint8_t fs_getcwd(char* out, uint8_t out_sz);
 
 /**
- * Find a file
+ * @brief Load a file from current directory into memory.
+ *
+ * @param filename 8.3 filename (with or without dot)
+ * @param location target memory
+ * @param filesize_out optional file size output (can be NULL)
+ * @return 0 on success, 0xFF on error
  */
-struct FAT32File* fat32_search_dir(const char* filename, uint8_t entry_type);
+uint8_t fs_load_file(const char* filename, uint8_t* location, uint32_t* filesize_out);
 
 /**
- * Load a file to location in RAM
+ * @brief Open file in current directory.
+ *
+ * @param filename 8.3 filename
+ * @return file descriptor [0..3] or -1 on failure
  */
-void fat32_load_file(const struct FAT32File* fileptr, uint8_t* location);
+fs_fd_t fs_open(const char* filename);
 
 /**
- * @brief Build a linked list of sector addresses starting from a root address
- * 
- * @param nextcluster first cluster in the linked list
+ * @brief Read bytes from open file descriptor.
+ *
+ * @param fd file descriptor from fs_open
+ * @param dst destination buffer
+ * @param len number of bytes requested
+ * @return number of bytes read
  */
-void fat32_build_linked_list(uint32_t nextcluster);
+uint16_t fs_read(fs_fd_t fd, uint8_t* dst, uint16_t len);
 
 /**
- * @brief Construct sector address from file entry
- * 
- * @return uint32_t sector address
+ * @brief Close open file descriptor.
+ *
+ * @param fd file descriptor
  */
-uint32_t fat32_grab_cluster_address_from_fileblock(uint8_t *loc);
-
-/**
- * @brief Calculate the sector address from cluster and sector
- * 
- * @param cluster which cluster
- * @param sector which sector on the cluster (0-Nclusters)
- * @return uint32_t sector address (512 byte address)
- */
-uint32_t fat32_calculate_sector_address(uint32_t cluster, uint8_t sector);
-
-/**
- * Compare function for qsort
- */
-int fat32_file_compare(const void* item1, const void *item2);
+void fs_close(fs_fd_t fd);
 
 #endif

@@ -22,42 +22,24 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "fat32.h"
+#include "fs/fat32.h"
 #include "io.h"
 #include "ramtest.h"
 #include "command.h"
 
-#define SDMAX 10        // number of attempts to connect to SD-card
-
 int main(void) {
-    uint8_t i;
-    uint8_t res;
-
     putstrnl("Starting system.");
     putstr("Clearing user space...   ");
     memset((void*)0x0800, 0xFF, 0x7700);
     putstrnl("[OK]");
 
-    putstr("Connecting to SD-card... ");
-    for(i=0; i<SDMAX; i++) {
-        res = boot_sd();
-        if(res == 0x00) {
-            putstrnl("[OK]");
-            break;
-        }
-    }
-    if(i == SDMAX) {
-        putch('\n');
-        putstrnl("Cannot open SD-card, exiting...");
+    putstr("Mounting filesystem...   ");
+    if(fs_mount() != 0x00) {
+        putstrnl("[FAIL]");
+        putstrnl("Cannot mount filesystem, exiting...");
         return -1;
     }
-
-    if(fat32_read_mbr() == 0x00) {
-        fat32_read_partition();
-    } else {
-        putstrnl("Cannot read MBR, exiting...");
-        return -1;
-    }
+    putstrnl("[OK]");
 
     // put system in infinite loop
     command_pwdcmd();

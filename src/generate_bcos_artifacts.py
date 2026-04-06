@@ -100,7 +100,8 @@ def generate_sbc_cfg() -> str:
     return f"""MEMORY {{
     ZP:     start = $20,   size = $40,   type = rw, define = yes;
     RAM:    start = $0300, size = $0500, define = yes;
-    ROM:    start = $C000, size = $4000, fill = $00;
+    ROM:    start = $C000, size = $4000, fill = $00, type = ro;
+    BANK2:  start = $A000, size = $2000, fill = $00, type = ro;
 }}
 
 SEGMENTS {{
@@ -112,6 +113,8 @@ SEGMENTS {{
     ONCE:      load = ROM, type = ro,  optional = yes;
     CODE:      load = ROM, type = ro;
     RODATA:    load = ROM, type = ro;
+    B2CODE:    load = BANK2, type = ro;
+    B2RODATA:  load = BANK2, type = ro;
     JUMPTABLE: load = ROM, type=ro,    start= ${JT_BASE:04X};
     VECTORS:   load = ROM, type = ro,  start    = ${VECTOR_START:04X};
 }}

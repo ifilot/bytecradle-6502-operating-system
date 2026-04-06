@@ -16,8 +16,8 @@ OBJDIR := obj
 ASMDIR := asm
 
 # sources
-CSRCS := $(wildcard *.c)
-ASRCS := $(wildcard *.s)
+CSRCS := $(wildcard *.c) $(wildcard fs/*.c)
+ASRCS := $(filter-out jumptable.s,$(wildcard *.s)) $(wildcard fs/*.s)
 
 # generated assembly from C
 CASMS := $(patsubst %.c,$(ASMDIR)/%.s,$(CSRCS))
@@ -25,6 +25,7 @@ CASMS := $(patsubst %.c,$(ASMDIR)/%.s,$(CSRCS))
 # object files
 OBJS := $(patsubst $(ASMDIR)/%.s,$(OBJDIR)/%.o,$(CASMS)) \
         $(patsubst %.s,$(OBJDIR)/%.o,$(ASRCS))
+OBJS += $(OBJDIR)/jumptable.o
 
 .PHONY: all generate run clean
 
@@ -39,15 +40,22 @@ $(OBJDIR) $(ASMDIR) $(BINDIR):
 
 # C -> ASM
 $(ASMDIR)/%.s: %.c | $(ASMDIR)
-	$(CC) -t none -O -Os --cpu 65c02 $< -o $@
+	@mkdir -p $(dir $@)
+	$(CC) -I . -t none -O -Os --cpu 65c02 $< -o $@
 
 # ASM -> OBJ (generated asm)
 $(OBJDIR)/%.o: $(ASMDIR)/%.s | $(OBJDIR)
-	$(AS) $< -o $@
+	@mkdir -p $(dir $@)
+	$(AS) -I . $< -o $@
 
 # ASM -> OBJ (handwritten asm)
 $(OBJDIR)/%.o: %.s | $(OBJDIR)
-	$(AS) $< -o $@
+	@mkdir -p $(dir $@)
+	$(AS) -I . $< -o $@
+
+# generated jump table object
+$(OBJDIR)/jumptable.o: jumptable.s generate | $(OBJDIR)
+	$(AS) -I . $< -o $@
 
 # base library copy
 $(BINDIR)/sbc.lib: $(OBJDIR)/crt0.o | $(BINDIR)
@@ -57,6 +65,7 @@ $(BINDIR)/sbc.lib: $(OBJDIR)/crt0.o | $(BINDIR)
 # link
 $(BINDIR)/$(ROMNAME): generate sbc.cfg $(OBJS) $(BINDIR)/sbc.lib | $(BINDIR)
 	$(LD) -C sbc.cfg $(OBJS) -o $@ $(BINDIR)/sbc.lib -m $(BINDIR)/sbc.map
+	truncate -s 24576 $@
 
 # run with safety checks
 run: $(BINDIR)/$(ROMNAME)

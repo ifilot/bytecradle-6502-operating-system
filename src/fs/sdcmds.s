@@ -2,7 +2,7 @@
 .include "functions.inc"
 .include "zeropage.inc"
 
-.segment "CODE"
+.segment "B2CODE"
 
 .PSC02
 

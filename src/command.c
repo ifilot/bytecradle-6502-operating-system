@@ -24,6 +24,7 @@
 static char command_buffer[40];
 static char* command_argv[20];
 static uint8_t command_argc;
+static uint8_t command_parse_too_many_args;
 static char* command_ptr = command_buffer;
 
 static const CommandEntry command_table[] = {
@@ -83,6 +84,7 @@ static uint8_t command_is_probably_binary(const uint8_t *data, uint32_t size) {
  */
 void command_loop() {
     uint8_t c;
+    const char *command_end = command_buffer + sizeof(command_buffer) - 1;
 
     c = getch();
     if(c != 0) {
@@ -98,8 +100,12 @@ void command_loop() {
             break;
             default:
                 if(c >= ' ' && c <= '~') {
-                    *(command_ptr++) = c;
-                    putch(c);
+                    if(command_ptr < command_end) {
+                        *(command_ptr++) = c;
+                        putch(c);
+                    } else {
+                        putch('\a');
+                    }
                 }
             break;
         }
@@ -115,6 +121,13 @@ void command_exec() {
     putstrnl("");
     *command_ptr = 0x00;    // place terminating byte
     command_parse();        // split string
+    if(command_parse_too_many_args != 0) {
+        putstrnl("Too many arguments");
+        command_ptr = command_buffer;
+        memset(command_buffer, 0x00, sizeof(command_buffer));
+        command_pwdcmd();
+        return;
+    }
 
     if(command_argc == 0) {
         command_pwdcmd();
@@ -137,7 +150,7 @@ void command_exec() {
     }
 
     command_ptr = command_buffer;
-    memset(command_buffer, 0x00, strlen(command_buffer));
+    memset(command_buffer, 0x00, sizeof(command_buffer));
     command_pwdcmd();
 }
 
@@ -146,17 +159,20 @@ void command_exec() {
  */
 void command_parse() {
     char* ptr = strtok(command_buffer, " ");
-    char** argv_ptr = command_argv;
     uint8_t i;
 
-    *(argv_ptr++) = ptr;
     command_argc = 0;
+    command_parse_too_many_args = 0;
 
     while(ptr != NULL) {
+        if(command_argc >= (sizeof(command_argv) / sizeof(command_argv[0]) - 1)) {
+            command_parse_too_many_args = 1;
+            break;
+        }
+        command_argv[command_argc++] = ptr;
         ptr = strtok(NULL, " ");
-        *(argv_ptr++) = ptr;
-        command_argc++;
     }
+    command_argv[command_argc] = NULL;
 
     for(i=0; i<command_argc; i++) {
         strupper(command_argv[i]);

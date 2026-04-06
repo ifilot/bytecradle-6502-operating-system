@@ -26,7 +26,7 @@ def test_can_run_diag_program_from_sdcard() -> None:
             "--sdcard",
             str(sd_image),
             "--clock",
-            "12.0",
+            "1000.0", # basically as quick as possible
             "--warnings-as-errors",
         ]
     )

@@ -8,7 +8,7 @@
 .export   __STARTUP__ : absolute = 1                    ; Mark as startup
 .import   __RAM_START__, __RAM_SIZE__ 			        ; Linker generated
 
-.import    copydata, zerobss, initlib, donelib, init_system
+.import    copydata, zerobss, initlib, donelib, init_system, clear_mem
 
 .include  "zeropage.inc"
 .include  "constants.inc"
@@ -40,6 +40,7 @@ _init:
 ;-------------------------------------------------------------------------------
 ; Initialize memory
 ;-------------------------------------------------------------------------------
+    jsr clear_mem               ; Clear RAM scratch area ($0200-$07FF)
     jsr zerobss                 ; Clear BSS segment
     jsr copydata                ; Initialize DATA segment
     jsr initlib                 ; Run constructors

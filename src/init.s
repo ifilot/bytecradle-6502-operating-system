@@ -5,7 +5,7 @@
 .import _putch
 .import makecrctable
 
-.export init_system
+.export init_system, clear_mem
 
 .segment "CODE"
 .PSC02
@@ -15,7 +15,6 @@
 ;-------------------------------------------------------------------------------
 init_system:
     jsr clear_zp
-    jsr clear_mem
     jsr init_acia
     jsr init_screen
     jsr makecrctable
@@ -41,16 +40,17 @@ clear_zp:
 ; Clear OS RAM
 ;-------------------------------------------------------------------------------
 clear_mem:
-    ldx #$00        ; x register will be our low byte counter
-    ldy #$02        ; y register will be our high byte counter
+    ldx #$00
 @next:
-    stz $0200,x     ; store zero at address $0200 + x
-    inx             ; increment x (low byte)
-    bne @next       ; if x is not zero, continue (low byte rolls over)
-    iny             ; increment y (high byte)
-    cpy #$08        ; have we reached $08 (end of range)?
-    bne @next       ; if not, continue
-    rts             ; return from subroutine
+    stz $0200,x
+    stz $0300,x
+    stz $0400,x
+    stz $0500,x
+    stz $0600,x
+    stz $0700,x
+    inx
+    bne @next
+    rts
 
 ;-------------------------------------------------------------------------------
 ; Initialize screen

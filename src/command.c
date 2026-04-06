@@ -443,7 +443,9 @@ uint8_t command_try_com() {
 void command_hexdump() {
     uint16_t addr;
     uint32_t parsed_addr;
-    uint16_t i=0;
+    uint16_t i = 0;
+    uint8_t linebuf[16];
+    uint8_t c;
     char* endptr;
 
     if(command_argc != 2) {
@@ -461,15 +463,29 @@ void command_hexdump() {
     }
     addr = (uint16_t)parsed_addr;
 
-    for(i=0; i<256; i++) {
+    for(i = 0; i < 256; i++) {
         if(i % 16 == 0) {
             puthexword(addr);
             putstr(": ");
         }
-        puthex(*(uint8_t*)addr);
+        c = *(uint8_t*)addr;
+        linebuf[i & 0x0F] = c;
+        puthex(c);
         addr++;
         putspace();
+
         if(i % 16 == 15) {
+            uint8_t j;
+
+            putstr(" | ");
+            for(j = 0; j < 16; j++) {
+                c = linebuf[j];
+                if(c >= 32 && c <= 127) {
+                    putch(c);
+                } else {
+                    putch('.');
+                }
+            }
             putstrnl("");
         }
     }

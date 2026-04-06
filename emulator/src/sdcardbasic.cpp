@@ -26,12 +26,17 @@
  * @param path to image file 
  */
 SdCardBasic::SdCardBasic(const std::string& image_filename,
-                        bool _verbose)
+                        bool _verbose,
+                        bool _read_only)
     : cs(false), clk(false), mosi_bit(false), miso_bit(false),
       mosi_shift_reg(0), miso_shift_reg(0), mosi_bit_count(0), miso_bit_count(0),
-      verbose(_verbose)
+      verbose(_verbose), read_only(_read_only)
 {
-    sdfile.open(image_filename, std::ios::binary);
+    auto mode = std::ios::in | std::ios::binary;
+    if (!this->read_only) {
+        mode |= std::ios::out;
+    }
+    sdfile.open(image_filename, mode);
     if (!sdfile) {
         std::cerr << "Failed to open SD card image: " << image_filename << std::endl;
         exit(-1);
@@ -90,6 +95,11 @@ void SdCardBasic::digest_sd() {
     static const std::vector<uint8_t> respcmd55 = {0xFF, 0x01};
     static const std::vector<uint8_t> respacmd41 = {0xFF, 0x00};
     static const std::vector<uint8_t> respcmd58 = {0xFF, 0x00, 0xC0, 0xFF, 0x80, 0x00};
+
+    if (awaiting_write_block) {
+        handle_cmd24_payload();
+        return;
+    }
 
     // discard any 0xFF bytes
     if(mosi_queue.size() == 1 && mosi_queue.front() == 0xFF) {
@@ -160,6 +170,19 @@ void SdCardBasic::digest_sd() {
             load_response_cmd17(addr);
             return;
         }
+
+        if (cmd[0] == (24 | 0x40)) {
+            pending_write_addr =
+                (cmd[1] << 24) |
+                (cmd[2] << 16) |
+                (cmd[3] << 8)  |
+                (cmd[4]);
+            awaiting_write_block = true;
+            cmd24_seen_token = false;
+            write_payload.clear();
+            load_response({0xFF, 0x00}); // command accepted
+            return;
+        }
     }
 }
 
@@ -180,10 +203,22 @@ void SdCardBasic::load_response(const std::vector<uint8_t>& resp) {
  * @param addr SD-card 512-byte address
  */
 void SdCardBasic::load_response_cmd17(uint32_t addr) {
-    if (!sdfile.is_open()) return;
+    std::array<uint8_t, 512> buffer{};
 
-    sdfile.seekg(addr * 512, std::ios::beg);
-    if (!sdfile) return;
+    auto dirty_it = dirty_blocks.find(addr);
+    if (dirty_it != dirty_blocks.end()) {
+        buffer = dirty_it->second;
+    } else {
+        if (!sdfile.is_open()) return;
+
+        sdfile.seekg(addr * 512, std::ios::beg);
+        if (!sdfile) return;
+
+        sdfile.read(reinterpret_cast<char*>(buffer.data()), static_cast<std::streamsize>(buffer.size()));
+        if (sdfile.gcount() != static_cast<std::streamsize>(buffer.size())) {
+            return;
+        }
+    }
 
     miso_queue.push(0xFF);  // wait
     miso_queue.push(0x00);  // command accepted
@@ -193,20 +228,54 @@ void SdCardBasic::load_response_cmd17(uint32_t addr) {
     miso_queue.push(0xFF);  // few wait bytes
     miso_queue.push(0xFE);  // data start token
 
-    char buffer[512];
-    sdfile.read(buffer, 512);
-    size_t bytes_read = sdfile.gcount();
-    for (size_t i = 0; i < bytes_read; ++i) {
-        miso_queue.push(static_cast<uint8_t>(buffer[i]));
+    for (size_t i = 0; i < buffer.size(); ++i) {
+        miso_queue.push(buffer[i]);
     }
 
     // if(verbose) {
     //     print_hexdump((const uint8_t*)buffer, 512);
     // }
 
-    uint16_t checksum = crc16_xmodem(reinterpret_cast<uint8_t*>(buffer), 512);
+    uint16_t checksum = crc16_xmodem(buffer.data(), buffer.size());
     miso_queue.push((checksum >> 8) & 0xFF);
     miso_queue.push(checksum & 0xFF);
+}
+
+void SdCardBasic::handle_cmd24_payload() {
+    while (!mosi_queue.empty()) {
+        const uint8_t value = mosi_queue.front();
+        mosi_queue.pop();
+
+        if (!cmd24_seen_token) {
+            if (value == 0xFE) {
+                cmd24_seen_token = true;
+            }
+            continue;
+        }
+
+        write_payload.push_back(value);
+
+        // Data payload (512 bytes) + CRC (2 bytes)
+        if (write_payload.size() == 514) {
+            if (read_only) {
+                std::array<uint8_t, 512> block{};
+                std::copy_n(write_payload.begin(), 512, block.begin());
+                dirty_blocks[pending_write_addr] = block;
+            } else if (sdfile.is_open()) {
+                sdfile.seekp(static_cast<std::streamoff>(pending_write_addr) * 512, std::ios::beg);
+                sdfile.write(reinterpret_cast<const char*>(write_payload.data()), 512);
+                sdfile.flush();
+            }
+
+            // Data response token: xxx00101 = 0x05 (accepted).
+            load_response({0xFF, 0x05, 0xFF});
+
+            awaiting_write_block = false;
+            cmd24_seen_token = false;
+            write_payload.clear();
+            return;
+        }
+    }
 }
 
 /**

@@ -29,8 +29,11 @@ jobs:
 
       - name: Build emulator
         run: |
-          cmake -S emulator/src -B emulator/build
+          cmake -S emulator/src -B emulator/build -DBUILD_TESTING=ON
           cmake --build emulator/build -j$(nproc)
+
+      - name: Run emulator unit tests
+        run: ctest --test-dir emulator/build --output-on-failure
 
       - name: Build BCOS
         run: make -C src

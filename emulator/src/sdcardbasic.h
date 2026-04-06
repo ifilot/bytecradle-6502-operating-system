@@ -29,6 +29,7 @@
 #include <cstring>
 #include <sstream>
 #include <iomanip>
+#include <unordered_map>
 
 #include "sdcarddevice.h"
 #include "debug.h"
@@ -46,7 +47,8 @@ public:
      * @param path whether to show verbose output (debugging)
      */
     SdCardBasic(const std::string& image_filename, 
-                bool _verbose = false);
+                bool _verbose = false,
+                bool _read_only = true);
 
     /**
      * @brief Receive /CS line signal
@@ -97,9 +99,16 @@ private:
     uint8_t mosi_bit_count;             // number of bits received in the current byte
     uint8_t miso_bit_count;             // number of bits remaining in the current byte
 
-    std::ifstream sdfile;               // file stream for the SD card image
+    std::fstream sdfile;                // file stream for the SD card image
 
     bool verbose = false;               // verbose mode
+    bool read_only = true;              // whether writes are persisted to image
+    std::unordered_map<uint32_t, std::array<uint8_t, 512>> dirty_blocks; // in-memory block overlay for read-only mode
+
+    bool awaiting_write_block = false;  // whether CMD24 write payload is pending
+    bool cmd24_seen_token = false;      // whether data token (0xFE) has been received
+    uint32_t pending_write_addr = 0;    // CMD24 target block address
+    std::vector<uint8_t> write_payload; // 512-byte payload + 2-byte CRC
 
     /**
      * @brief digest SD-card commands
@@ -120,6 +129,12 @@ private:
      * @param addr SD-card 512-byte address
      */
     void load_response_cmd17(uint32_t addr);
+
+    /**
+     * @brief Handle received payload for CMD24 and write 512-byte block
+     *
+     */
+    void handle_cmd24_payload();
     
     /**
      * @brief Calculate CRC16 using XMODEM polynomial

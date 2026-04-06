@@ -30,6 +30,7 @@
  */
 ByteCradleMini::ByteCradleMini(const std::string& romfile, 
                                const std::string& sdcardfile,
+                               bool _sdcard_read_only,
                                bool _debug_mode,
                                bool _warnings_as_errors) {
     cpu = vrEmu6502New(CPU_W65C02, memread, memwrite, this);
@@ -48,7 +49,7 @@ ByteCradleMini::ByteCradleMini(const std::string& romfile,
     this->via = std::make_unique<VIA>(ByteCradleMini::VIA_MASK, 
                                       ByteCradleMini::VIA_MASK_SIZE, 
                                       irq);
-    this->via->create_sdcard_and_attach(sdcardfile, this->debug_mode);
+    this->via->create_sdcard_and_attach(sdcardfile, this->debug_mode, _sdcard_read_only);
 }
 
 /**

@@ -26,6 +26,8 @@
 #include <csignal>
 #include <string>
 
+#include <CLI/CLI.hpp>
+
 #include "bytecradletiny.h"
 #include "bytecradlemini.h"
 #include "terminal.h"
@@ -40,84 +42,40 @@ namespace {
         std::string sdcard_path;
         double clock_mhz {16.0};
         bool debug_mode {false};
+        bool sdcard_read_only {true};
+        bool sdcard_write_through {false};
         bool warnings_as_errors {false};
-        bool show_help {false};
     };
 
-    void print_usage(const char* argv0) {
-        std::cout
-            << "ByteCradle Emulator\n\n"
-            << "Usage:\n"
-            << "  " << argv0 << " -b <tiny|mini> -r <rom_path> [options]\n\n"
-            << "Options:\n"
-            << "  -b, --board   Board type (tiny or mini)\n"
-            << "  -r, --rom     Path to ROM file\n"
-            << "  -s, --sdcard  Path to SD card image (required for mini)\n"
-            << "  -c, --clock   CPU clock speed in MHz (default: 16.0)\n"
-            << "  -d, --debug   Enable debug mode\n"
-            << "  -w, --warnings-as-errors  Treat warning exceptions as fatal errors\n"
-            << "  -h, --help    Show this help message\n";
-    }
+    int parse_args(int argc, char** argv, EmulatorOptions& options) {
+        CLI::App app{"ByteCradle Emulator"};
 
-    bool parse_args(int argc, char** argv, EmulatorOptions& options) {
-        for (int i = 1; i < argc; ++i) {
-            const std::string arg = argv[i];
+        app.add_option("-b,--board", options.board_type, "Board type (tiny or mini)")
+            ->check(CLI::IsMember({"tiny", "mini"}))
+            ->default_val("tiny");
+        app.add_option("-r,--rom", options.rom_path, "Path to ROM file")->required();
+        app.add_option("-s,--sdcard", options.sdcard_path, "Path to SD card image (required for mini)");
+        app.add_option("-c,--clock", options.clock_mhz, "CPU clock speed in MHz")->default_val(16.0);
+        app.add_flag("-d,--debug", options.debug_mode, "Enable debug mode");
+        app.add_flag("--sdcard-write-through", options.sdcard_write_through,
+                     "Persist SD card writes to image file");
+        app.add_flag("-w,--warnings-as-errors", options.warnings_as_errors,
+                     "Treat warning exceptions as fatal errors");
 
-            auto require_value = [&](const std::string& flag, std::string& out) -> bool {
-                if (i + 1 >= argc) {
-                    std::cerr << "Error: Missing value for " << flag << ".\n";
-                    return false;
-                }
-                out = argv[++i];
-                return true;
-            };
-
-            if (arg == "-h" || arg == "--help") {
-                options.show_help = true;
-                return true;
-            } else if (arg == "-b" || arg == "--board") {
-                if (!require_value(arg, options.board_type)) {
-                    return false;
-                }
-            } else if (arg == "-r" || arg == "--rom") {
-                if (!require_value(arg, options.rom_path)) {
-                    return false;
-                }
-            } else if (arg == "-s" || arg == "--sdcard") {
-                if (!require_value(arg, options.sdcard_path)) {
-                    return false;
-                }
-            } else if (arg == "-c" || arg == "--clock") {
-                std::string raw_clock;
-                if (!require_value(arg, raw_clock)) {
-                    return false;
-                }
-                try {
-                    options.clock_mhz = std::stod(raw_clock);
-                } catch (...) {
-                    std::cerr << "Error: Invalid clock value '" << raw_clock << "'.\n";
-                    return false;
-                }
-                if (options.clock_mhz <= 0.0) {
-                    std::cerr << "Error: Clock speed must be greater than zero.\n";
-                    return false;
-                }
-            } else if (arg == "-d" || arg == "--debug") {
-                options.debug_mode = true;
-            } else if (arg == "-w" || arg == "--warnings-as-errors") {
-                options.warnings_as_errors = true;
-            } else {
-                std::cerr << "Error: Unknown argument '" << arg << "'.\n";
-                return false;
-            }
+        try {
+            app.parse(argc, argv);
+        } catch (const CLI::ParseError &e) {
+            return app.exit(e);
         }
 
-        if (options.rom_path.empty() && !options.show_help) {
-            std::cerr << "Error: ROM path must be specified using -r / --rom.\n";
-            return false;
+        if (options.clock_mhz <= 0.0) {
+            std::cerr << "Error: Clock speed must be greater than zero.\n";
+            return 1;
         }
 
-        return true;
+        options.sdcard_read_only = !options.sdcard_write_through;
+
+        return 0;
     }
 
     void handle_sigint(int) {
@@ -132,14 +90,9 @@ namespace {
 
 int main(int argc, char** argv) {
     EmulatorOptions options;
-    if (!parse_args(argc, argv, options)) {
-        print_usage(argv[0]);
-        return 1;
-    }
-
-    if (options.show_help) {
-        print_usage(argv[0]);
-        return 0;
+    const int parse_result = parse_args(argc, argv, options);
+    if (parse_result != 0) {
+        return parse_result;
     }
 
     double cpuFrequency = options.clock_mhz * 1'000'000.0; // Convert MHz to Hz
@@ -159,6 +112,7 @@ int main(int argc, char** argv) {
         board = std::make_unique<ByteCradleMini>(
             options.rom_path,
             options.sdcard_path,
+            options.sdcard_read_only,
             options.debug_mode,
             options.warnings_as_errors
         );

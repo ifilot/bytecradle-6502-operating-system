@@ -57,7 +57,8 @@ public:
     void write(uint16_t addr, uint8_t data);
 
     void create_sdcard_and_attach(const std::string& image_filename,
-                                  bool verbose = false);
+                                  bool verbose = false,
+                                  bool read_only = true);
 
     /**
      * @brief Whether the ACIA responds to the given address

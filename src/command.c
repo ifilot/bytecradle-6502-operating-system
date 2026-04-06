@@ -35,6 +35,48 @@ static const CommandEntry command_table[] = {
 };
 
 /**
+ * @brief Heuristic check for binary data in a text viewer.
+ *
+ * Rule of thumb:
+ * - Immediate binary if NUL byte is present.
+ * - Otherwise, if >10% of sampled bytes are unusual control characters,
+ *   classify as binary.
+ */
+static uint8_t command_is_probably_binary(const uint8_t *data, uint32_t size) {
+    uint32_t sample = size > 512 ? 512 : size;
+    uint32_t i;
+    uint16_t suspicious = 0;
+    uint8_t c;
+
+    for(i = 0; i < sample; i++) {
+        c = data[i];
+
+        if(c == 0x00) {
+            return 1;
+        }
+
+        if(c < 0x20 &&
+           c != '\t' &&
+           c != '\n' &&
+           c != '\r' &&
+           c != '\f' &&
+           c != 0x1B) {
+            suspicious++;
+        }
+
+        if(c == 0x7F) {
+            suspicious++;
+        }
+    }
+
+    if(sample == 0) {
+        return 0;
+    }
+
+    return (uint8_t)((uint32_t)suspicious * 10 > sample);
+}
+
+/**
  * @brief Continuously sample keyboard input, retrieve and parse commands
  */
 void command_loop() {
@@ -185,7 +227,8 @@ void command_more() {
     const uint8_t *ptr;
     uint32_t filesize = 0;
     uint8_t linecounter = 0;
-    uint8_t charcounter = 0;
+    uint8_t column = 0;
+    uint8_t c;
 
     // ensure proper RAM bank
     asm("lda #63");
@@ -200,26 +243,60 @@ void command_more() {
         putstrnl("Cannot find file.");
         return;
     }
+
     ptr = (uint8_t*)0x1000;
+
+    if(command_is_probably_binary(ptr, filesize)) {
+        putstrnl("Binary file detected. Use HEXDUMP.");
+        return;
+    }
+
     while(filesize-- > 0) {
-        if(*ptr == '\n') {
-            ptr++;
+        c = *(ptr++);
+
+        if(c == '\r') {
+            continue;
+        }
+
+        if(c == '\n') {
             putcrlf();
+            column = 0;
             linecounter++;
+        } else if(c == '\t') {
+            do {
+                putch(' ');
+                column++;
+
+                if(column == 80) {
+                    putcrlf();
+                    column = 0;
+                    linecounter++;
+                }
+            } while((column & 0x07) != 0);
         } else {
-            putch(*(ptr++));
+            if(c < ' ' || c > '~') {
+                c = '.';
+            }
+
+            putch(c);
+            column++;
+
+            if(column == 80) {
+                putcrlf();
+                column = 0;
+                linecounter++;
+            }
         }
 
-        charcounter++;
-        if(charcounter == 80) {
-            putcrlf();
-            charcounter = 0;
-            linecounter++;
-        }
-
-        if(linecounter == 20) {
-            putstrnl("--- Press SPACE to continue ---");
-            while(getch() != ' ') {}
+        if(linecounter >= 20) {
+            putstrnl("--- SPACE: next page, Q: quit ---");
+            do {
+                c = getch();
+                if(c == 'q' || c == 'Q') {
+                    putstrnl("");
+                    return;
+                }
+            } while(c != ' ');
             linecounter = 0;
         }
     }

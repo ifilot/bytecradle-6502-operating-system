@@ -25,7 +25,6 @@
 #include <iostream>
 
 #include "sdcardbasic.h"
-#include "vrEmu6502/vrEmu6502.h"
 
 #define VIA_REG_ORB   0x00
 #define VIA_REG_ORA   0x01
@@ -50,7 +49,7 @@ private:
     std::unique_ptr<SdCardDevice> sdcard; // Pointer to the SD card object
 
 public:
-    VIA(uint16_t _basemask, uint8_t bitmasksize, vrEmu6502Interrupt *_irq);
+    VIA(uint16_t _basemask, uint8_t bitmasksize);
 
     uint8_t read(uint16_t addr);
 

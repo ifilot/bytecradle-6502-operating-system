@@ -25,10 +25,10 @@
  * 
  * @param _basemask base address mask
  * @param bitmasksize size of the bitmask
- * @param _irq pointer to the interrupt handler
+ * @param _bus bus used to signal IRQ
  */
-ACIA::ACIA(uint16_t _basemask, uint8_t bitmasksize, vrEmu6502Interrupt *_irq)
-    : basemask(_basemask), irq(_irq) {
+ACIA::ACIA(uint16_t _basemask, uint8_t bitmasksize, cpp65::Bus *_bus)
+    : basemask(_basemask), bus(_bus) {
     
     this->mask = static_cast<uint16_t>(0xFFFF << (16 - bitmasksize));
 }
@@ -45,7 +45,7 @@ void ACIA::keypress(char ch) {
     }
     this->keybuffer.push_back(ch);
 
-    *irq = IntRequested;
+    bus->irq();
 }
 
 /**
@@ -60,7 +60,7 @@ uint8_t ACIA::read(uint16_t addr) {
     switch(offset) {
         case ACIA_DATA: // Read UART content
             if (!keybuffer.empty()) {
-                *irq = IntCleared;
+                bus->clear_irq();
                 char ch = keybuffer.front();
                 keybuffer.pop_front();
 

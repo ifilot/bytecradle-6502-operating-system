@@ -116,23 +116,6 @@ public:
      */
     inline auto& get_via() { return this->via; }
 
-private:
-    /**
-     * @brief Read memory function
-     * 
-     * This function also needs to handle any memory mapped I/O devices
-     * 
-     * @param addr memory address
-     * @param isDbg 
-     * @return uint8_t value at memory address
-     */
-    static uint8_t memread(VrEmu6502 *cpu, uint16_t addr, bool isDbg);
-
-    /**
-     * @brief Write to memory function
-     * 
-     * @param addr memory address
-     * @param val value to write
-     */
-    static void memwrite(VrEmu6502 *cpu, uint16_t addr, uint8_t val);
+    uint8_t read(uint16_t addr) override;
+    void write(uint16_t addr, uint8_t val) override;
 };

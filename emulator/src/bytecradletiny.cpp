@@ -30,9 +30,6 @@
 ByteCradleTiny::ByteCradleTiny(const std::string& romfile,
                                bool _debug_mode,
                                bool _warnings_as_errors) {
-    // initialize CPU
-    cpu = vrEmu6502New(CPU_W65C02, memread, memwrite, this);
-    irq = vrEmu6502Int(cpu);
     debug_mode = _debug_mode;
     warnings_as_errors = _warnings_as_errors;
 
@@ -43,7 +40,7 @@ ByteCradleTiny::ByteCradleTiny(const std::string& romfile,
     // set interface chips
     this->acia = std::make_unique<ACIA>(ByteCradleTiny::ACIA_MASK, 
                                         ByteCradleTiny::ACIA_MASK_SIZE, 
-                                        irq);
+                                        this);
 }
 
 /**
@@ -63,25 +60,19 @@ ByteCradleTiny::~ByteCradleTiny() {
  * @param isDbg 
  * @return uint8_t value at memory address
  */
-uint8_t ByteCradleTiny::memread(VrEmu6502 *cpu, uint16_t addr, bool isDbg) {
-    auto obj = static_cast<ByteCradleTiny*>(vrEmu6502GetUserData(cpu));
-    auto &ram = obj->get_ram();
-    auto &rom = obj->get_rom();
-    auto& keybuffer = obj->get_keybuffer();
-    auto& irq = obj->irq;
-
+uint8_t ByteCradleTiny::read(uint16_t addr) {
     // ROM chip
     if(addr >= 0x8000) {
-        return rom[addr - 0x8000];
+        return this->rom[addr - 0x8000];
     }
 
     // lower RAM
     if (addr < 0x7F00) {
-        return ram[addr];
+        return this->ram[addr];
     }
 
-    if(obj->get_acia()->responds(addr)) {
-        return obj->get_acia()->read(addr);
+    if(this->get_acia()->responds(addr)) {
+        return this->get_acia()->read(addr);
     }
 
     printf("[ERROR] Invalid write: %04X.\n", addr);
@@ -95,18 +86,15 @@ uint8_t ByteCradleTiny::memread(VrEmu6502 *cpu, uint16_t addr, bool isDbg) {
  * @param addr memory address
  * @param val value to write
  */
-void ByteCradleTiny::memwrite(VrEmu6502 *cpu, uint16_t addr, uint8_t val) {
-    auto obj = static_cast<ByteCradleTiny*>(vrEmu6502GetUserData(cpu));
-    auto &ram = obj->get_ram();
-    
+void ByteCradleTiny::write(uint16_t addr, uint8_t val) {
     // store in lower memory
     if (addr < 0x7F00) {
-        ram[addr] = val;
+        this->ram[addr] = val;
         return;
     }
 
-    if(obj->get_acia()->responds(addr)) {
-        obj->get_acia()->write(addr, val);
+    if(this->get_acia()->responds(addr)) {
+        this->get_acia()->write(addr, val);
         return;
     }
 
@@ -123,7 +111,7 @@ void ByteCradleTiny::memwrite(VrEmu6502 *cpu, uint16_t addr, uint8_t val) {
     if (addr >= 0x8000) {
         char buffer[64];
         std::snprintf(buffer, sizeof(buffer), "Write to read-only ROM at $%04X.", addr);
-        obj->warning_exception(buffer);
+        this->warning_exception(buffer);
         return;
     }
 

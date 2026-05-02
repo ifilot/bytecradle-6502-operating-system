@@ -20,7 +20,7 @@
 
 #include "via.h"
 
-VIA::VIA(uint16_t _basemask, uint8_t bitmasksize, vrEmu6502Interrupt *_irq)
+VIA::VIA(uint16_t _basemask, uint8_t bitmasksize)
     : basemask(_basemask), ddra(0), ddrb(0), ora(0), orb(0) {
 
     this->mask = static_cast<uint16_t>(0xFFFF << (16 - bitmasksize));

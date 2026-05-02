@@ -9,7 +9,7 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release" "MinSizeRel" "RelWithDebInfo")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
@@ -21,19 +21,32 @@ set(EMULATOR_CORE_SOURCES
     sdcardbasic.cpp
     terminal.cpp
     via.cpp
-    vrEmu6502/vrEmu6502.c
 )
 
-add_library(bc6502emu_core STATIC ${EMULATOR_CORE_SOURCES})
-target_include_directories(bc6502emu_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
-
 include(FetchContent)
+set(CPP65_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(CPP65_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 FetchContent_Declare(
     CLI11
     GIT_REPOSITORY https://github.com/CLIUtils/CLI11.git
     GIT_TAG v2.4.2
 )
 FetchContent_MakeAvailable(CLI11)
+
+FetchContent_Declare(
+    cpp65
+    GIT_REPOSITORY https://github.com/ifilot/cpp65.git
+    GIT_TAG v1.0.0
+)
+FetchContent_GetProperties(cpp65)
+if(NOT cpp65_POPULATED)
+    FetchContent_Populate(cpp65)
+    add_subdirectory(${cpp65_SOURCE_DIR} ${cpp65_BINARY_DIR} EXCLUDE_FROM_ALL)
+endif()
+
+add_library(bc6502emu_core STATIC ${EMULATOR_CORE_SOURCES})
+target_include_directories(bc6502emu_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(bc6502emu_core PUBLIC cpp65_core)
 
 add_executable(bc6502emu main.cpp)
 target_link_libraries(bc6502emu PRIVATE bc6502emu_core CLI11::CLI11)

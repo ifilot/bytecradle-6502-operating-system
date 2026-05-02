@@ -25,7 +25,7 @@
 #include <iostream>
 #include <deque>
 
-#include "vrEmu6502/vrEmu6502.h"
+#include "bus.h"
 
 #define ACIA_DATA 0x00
 #define ACIA_STAT 0x01
@@ -41,7 +41,7 @@ class ACIA {
 private:
     uint16_t basemask;              // basemask to respond to
     uint16_t mask;                  // address mask
-    vrEmu6502Interrupt *irq;        // interrupt line
+    cpp65::Bus *bus;                // bus used to signal IRQ
     uint8_t registers[4];           // internal registers
 
     std::deque<char> keybuffer;     // keyboard buffer
@@ -51,9 +51,9 @@ public:
      * 
      * @param _basemask base address mask
      * @param bitmasksize size of the bitmask
-     * @param _irq pointer to the interrupt handler
+     * @param _bus bus used to signal IRQ
      */
-    ACIA(uint16_t _basemask, uint8_t bitmasksize, vrEmu6502Interrupt *_irq);
+    ACIA(uint16_t _basemask, uint8_t bitmasksize, cpp65::Bus *_bus);
 
     /**
      * @brief read implementation for the 65C51 ACIA

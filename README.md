@@ -6,7 +6,6 @@ This repository contains the **software stack** for the ByteCradle 6502 platform
 
 - a terminal-based emulator
 - BCOS (ByteCradle OS) ROM sources
-- firmware/environment ROMs
 - sample user programs
 
 ![screenshot of the ByteCradle 6502 emulator](img/screenshot-emulator.png)
@@ -18,8 +17,9 @@ This repository contains the **software stack** for the ByteCradle 6502 platform
 ## Repository layout
 
 - `emulator/` - C++ emulator (`bc6502emu`) and helper scripts.
-- `src/`      - Operating system
+- `src/` - BCOS ROM sources and build scripts.
 - `programs/` - example programs that target BCOS.
+- `tests/` - unit and end-to-end tests.
 
 ## Dependencies
 
@@ -28,7 +28,7 @@ This repository contains the **software stack** for the ByteCradle 6502 platform
 - `make`
 - `python3`
 - `cmake`
-- C++ compiler with C++17 support (e.g. `g++`)
+- C++ compiler with C++20 support (e.g. `g++`)
 - [cc65](https://cc65.github.io/) toolchain (`ca65`, `ld65`, `cc65`, `ar65`)
 
 Example install on Ubuntu/Debian:
@@ -37,6 +37,17 @@ Example install on Ubuntu/Debian:
 sudo apt update
 sudo apt install -y build-essential cmake make python3 cc65
 ```
+
+### CMake-fetched libraries
+
+The emulator build fetches a few C++ libraries automatically:
+
+- [`cpp65`](https://github.com/ifilot/cpp65) - WDC 65C02 processor core used by `bc6502emu`.
+- [`CLI11`](https://github.com/CLIUtils/CLI11) - command-line option parsing.
+- [`Catch2`](https://github.com/catchorg/Catch2) - unit test framework, fetched only when tests are enabled.
+
+`cpp65` is the only external CPU/emulation library. It is pinned in
+`emulator/src/CMakeLists.txt` for reproducible builds.
 
 ## Build instructions
 
@@ -54,6 +65,8 @@ From the repository root:
 ```bash
 make -C src
 ```
+
+This writes the ROM image to `src/bin/bcos.bin`.
 
 ### 3) Build sample programs
 
@@ -74,8 +87,34 @@ This script is invoked automatically by both `make -C src` and `make -C programs
 Example (mini board + SD image):
 
 ```bash
-./emulator/build/bc6502emu -b mini -r src/bcos.bin -s emulator/script/sdcard.img
+./emulator/build/bc6502emu -b mini -r src/bin/bcos.bin -s emulator/script/sdcard.img
 ```
+
+For a tiny-board ROM:
+
+```bash
+./emulator/build/bc6502emu -b tiny -r path/to/rom.bin
+```
+
+## Tests
+
+Build and run emulator unit tests:
+
+```bash
+cmake -S emulator/src -B emulator/build
+cmake --build emulator/build -j
+ctest --test-dir emulator/build --output-on-failure
+```
+
+Run end-to-end tests, which build the emulator, BCOS, and sample programs before
+driving the emulator through a pseudo-terminal:
+
+```bash
+pytest -q tests/e2e
+```
+
+Some e2e tests use an SD-card image. By default they look for
+`emulator/script/sdcard.img`; override this with `BC6502_SDCARD_IMAGE=/path/to/sdcard.img`.
 
 ## License
 

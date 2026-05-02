@@ -28,14 +28,14 @@
 #include <memory>
 #include <string>
 
-#include "vrEmu6502/vrEmu6502.h"
+#include "cpu.h"
 #include "acia.h"
 
 /**
  * @brief ByteCradle Board Emulator - Base Class
  * 
  */
-class ByteCradleBoard {
+class ByteCradleBoard : public cpp65::Bus {
 public:
     /**
      * @brief Construct a new Byte Cradle Board object
@@ -54,7 +54,7 @@ public:
      * 
      */
     inline void tick() {
-        vrEmu6502Tick(this->cpu);
+        this->cpu.tick();
     }
 
     /**
@@ -64,7 +64,8 @@ public:
      * 
      */
     inline void reset() {
-        vrEmu6502Reset(this->cpu);
+        cpp65::Bus::reset();
+        this->cpu.tick();
     }
 
     /**
@@ -92,16 +93,13 @@ public:
 protected:
     std::unique_ptr<ACIA> acia;     // Pointer to the ACIA object
 
-    VrEmu6502 *cpu;
-    vrEmu6502Interrupt *irq;
+    cpp65::CPU cpu;
 
     bool debug_mode = false;
     bool warnings_as_errors = false;
     bool stop_requested = false;
 
     inline auto& get_keybuffer() { return this->acia->get_keybuffer(); }
-    inline auto& get_irq() { return irq; }
-
     /**
      * @brief Emit a warning exception event.
      *

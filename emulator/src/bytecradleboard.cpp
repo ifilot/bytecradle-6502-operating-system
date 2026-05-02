@@ -25,7 +25,7 @@
  * 
  */
 ByteCradleBoard::ByteCradleBoard()
-    : cpu(nullptr) {
+    : cpu(*this, cpp65::CPUModel::wdc65c02) {
 }
 
 /**
@@ -33,10 +33,6 @@ ByteCradleBoard::ByteCradleBoard()
  * 
  */
 ByteCradleBoard::~ByteCradleBoard() {
-    if (cpu) {
-        vrEmu6502Destroy(cpu);
-        cpu = nullptr;
-    }
 }
 
 /**

@@ -4,6 +4,8 @@
 Reports occupancy for:
 - banks 0+1 combined (16 KiB window at $C000-$FFFF)
 - bank 2 (8 KiB window at $A000-$BFFF)
+- bank 3 (8 KiB window at $A000-$BFFF)
+- bank 4 (8 KiB window at $A000-$BFFF)
 """
 
 from __future__ import annotations
@@ -13,7 +15,7 @@ import re
 from pathlib import Path
 
 BANK01_CAPACITY = 0x4000
-BANK2_CAPACITY = 0x2000
+BANK_CAPACITY = 0x2000
 
 BANK01_SEGMENTS = ("STARTUP", "ONCE", "CODE", "RODATA", "JUMPTABLE", "VECTORS")
 
@@ -63,9 +65,13 @@ def main() -> None:
 
     bank01_used = data_size + sum(segments.get(name, 0) for name in BANK01_SEGMENTS)
     bank2_used = segments.get("B2CODE", 0) + segments.get("B2RODATA", 0)
+    bank3_used = segments.get("B3CODE", 0) + segments.get("B3RODATA", 0)
+    bank4_used = segments.get("B4CODE", 0) + segments.get("B4RODATA", 0)
 
     bank01_free = BANK01_CAPACITY - bank01_used
-    bank2_free = BANK2_CAPACITY - bank2_used
+    bank2_free = BANK_CAPACITY - bank2_used
+    bank3_free = BANK_CAPACITY - bank3_used
+    bank4_free = BANK_CAPACITY - bank4_used
 
     report = "\n".join(
         [
@@ -77,14 +83,20 @@ def main() -> None:
             "## Capacity",
             "",
             f"- Banks 0+1 combined: {BANK01_CAPACITY} bytes",
-            f"- Bank 2: {BANK2_CAPACITY} bytes",
+            f"- Bank 2: {BANK_CAPACITY} bytes",
+            f"- Bank 3: {BANK_CAPACITY} bytes",
+            f"- Bank 4: {BANK_CAPACITY} bytes",
             "",
             "## Usage",
             "",
             f"- Banks 0+1 used: {bank01_used} bytes ({percent(bank01_used, BANK01_CAPACITY):.2f}%)",
             f"- Banks 0+1 free: {bank01_free} bytes",
-            f"- Bank 2 used: {bank2_used} bytes ({percent(bank2_used, BANK2_CAPACITY):.2f}%)",
+            f"- Bank 2 used: {bank2_used} bytes ({percent(bank2_used, BANK_CAPACITY):.2f}%)",
             f"- Bank 2 free: {bank2_free} bytes",
+            f"- Bank 3 used: {bank3_used} bytes ({percent(bank3_used, BANK_CAPACITY):.2f}%)",
+            f"- Bank 3 free: {bank3_free} bytes",
+            f"- Bank 4 used: {bank4_used} bytes ({percent(bank4_used, BANK_CAPACITY):.2f}%)",
+            f"- Bank 4 free: {bank4_free} bytes",
             "",
             "## Breakdown",
             "",
@@ -92,6 +104,10 @@ def main() -> None:
             *[f"- {name}: {segments.get(name, 0)} bytes" for name in BANK01_SEGMENTS],
             f"- B2CODE: {segments.get('B2CODE', 0)} bytes",
             f"- B2RODATA: {segments.get('B2RODATA', 0)} bytes",
+            f"- B3CODE: {segments.get('B3CODE', 0)} bytes",
+            f"- B3RODATA: {segments.get('B3RODATA', 0)} bytes",
+            f"- B4CODE: {segments.get('B4CODE', 0)} bytes",
+            f"- B4RODATA: {segments.get('B4RODATA', 0)} bytes",
             "",
         ]
     )

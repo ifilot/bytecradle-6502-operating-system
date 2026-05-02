@@ -3,11 +3,12 @@ OBJ  = helloworld.o
 CFG  = rom.cfg
 PATCH = ../common/patch_com_header.py
 ABI_MAJOR = 1
-ABI_MINOR = 0
+ABI_MINOR = 1
+JT_INC = ../../src/jumptable.inc
 
 all: $(PROG)
 
-$(OBJ): helloworld.asm
+$(OBJ): helloworld.asm $(JT_INC)
 	ca65 helloworld.asm -o $(OBJ)
 
 $(PROG): $(OBJ)

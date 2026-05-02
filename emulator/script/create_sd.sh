@@ -94,6 +94,12 @@ EOF
 cat > "$TMP_DIR/HELLO.TXT" <<'EOF'
 Hello World!
 EOF
+: > "$TMP_DIR/EMPTY.TXT"
+BIG_FILE="$TMP_DIR/BIG.TXT"
+: > "$BIG_FILE"
+for i in $(seq 0 599); do
+    printf "\\$(printf '%03o' $((65 + (i % 26))))" >> "$BIG_FILE"
+done
 cat > "$TMP_DIR/FILE1.TXT" <<'EOF'
 Sample file 1
 EOF
@@ -103,6 +109,8 @@ EOF
 
 mcopy -i "$MTOOLS_IMAGE" "$TMP_DIR/README.TXT" ::/README.TXT
 mcopy -i "$MTOOLS_IMAGE" "$TMP_DIR/HELLO.TXT" ::/HELLO.TXT
+mcopy -i "$MTOOLS_IMAGE" "$TMP_DIR/EMPTY.TXT" ::/EMPTY.TXT
+mcopy -i "$MTOOLS_IMAGE" "$TMP_DIR/BIG.TXT" ::/BIG.TXT
 mcopy -i "$MTOOLS_IMAGE" "$TMP_DIR/FILE1.TXT" ::/FOLDER1/SUB1/FILE1.TXT
 mcopy -i "$MTOOLS_IMAGE" "$TMP_DIR/FILE2.TXT" ::/FOLDER1/SUB2/FILE2.TXT
 mcopy -i "$MTOOLS_IMAGE" "$TMP_DIR/FILE1.TXT" ::/FOLDER2/SUB1/FILE1.TXT
@@ -118,5 +126,6 @@ mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/fibonacci/FIBO.COM" ::/PROGRAMS/FIB
 mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/monitor/monitor.bin" ::/PROGRAMS/MONITOR.COM
 mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/mandelbrot/MANDEL.COM" ::/PROGRAMS/MANDEL.COM
 mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/argtest/ARGTEST.COM" ::/PROGRAMS/ARGTEST.COM
+mcopy -i "$MTOOLS_IMAGE" "$ROOT_DIR/programs/fstest/FSTEST.COM" ::/PROGRAMS/FSTEST.COM
 
 echo "SD card image creation completed: $IMAGE_NAME"

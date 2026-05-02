@@ -215,6 +215,45 @@ TEST_CASE("SD card CMD24 stores writes in memory when read-only", "[sdcard]") {
     std::filesystem::remove(image);
 }
 
+TEST_CASE("SD card read-only CMD24 readback uses dirty overlay but does not persist", "[sdcard][write-retention]") {
+    const std::string image = create_sd_image();
+    std::array<uint8_t, 512> expected{};
+    for (size_t i = 0; i < expected.size(); ++i) {
+        expected[i] = static_cast<uint8_t>(0x5A ^ (i & 0xFF));
+    }
+
+    {
+        SdCardBasic sd(image, false, true);
+        write_sector(sd, 1, expected);
+
+        auto readback = read_sector(sd, 1);
+        REQUIRE(readback == expected);
+    }
+
+    {
+        std::ifstream in(image, std::ios::binary);
+        REQUIRE(in.good());
+        in.seekg(512, std::ios::beg);
+
+        std::array<uint8_t, 512> file_data{};
+        in.read(reinterpret_cast<char*>(file_data.data()), static_cast<std::streamsize>(file_data.size()));
+        REQUIRE(in.gcount() == static_cast<std::streamsize>(file_data.size()));
+        for (size_t i = 0; i < file_data.size(); ++i) {
+            REQUIRE(file_data[i] == static_cast<uint8_t>(i & 0xFF));
+        }
+    }
+
+    {
+        SdCardBasic sd(image, false, true);
+        auto readback = read_sector(sd, 1);
+        for (size_t i = 0; i < readback.size(); ++i) {
+            REQUIRE(readback[i] == static_cast<uint8_t>(i & 0xFF));
+        }
+    }
+
+    std::filesystem::remove(image);
+}
+
 TEST_CASE("SD card CMD24 writes through to image when write-through is enabled", "[sdcard]") {
     const std::string image = create_sd_image();
     SdCardBasic sd(image, false, false);
@@ -248,6 +287,41 @@ TEST_CASE("SD card CMD24 writes through to image when write-through is enabled",
     REQUIRE(in.gcount() == static_cast<std::streamsize>(verify.size()));
     for (size_t i = 0; i < verify.size(); ++i) {
         REQUIRE(verify[i] == static_cast<uint8_t>(0xC0 + (i & 0x0F)));
+    }
+
+    std::filesystem::remove(image);
+}
+
+TEST_CASE("SD card write-through CMD24 persists and survives remount", "[sdcard][write-retention]") {
+    const std::string image = create_sd_image();
+    std::array<uint8_t, 512> expected{};
+    for (size_t i = 0; i < expected.size(); ++i) {
+        expected[i] = static_cast<uint8_t>((0x33 + i * 11) & 0xFF);
+    }
+
+    {
+        SdCardBasic sd(image, false, false);
+        write_sector(sd, 1, expected);
+
+        auto readback = read_sector(sd, 1);
+        REQUIRE(readback == expected);
+    }
+
+    {
+        std::ifstream in(image, std::ios::binary);
+        REQUIRE(in.good());
+        in.seekg(512, std::ios::beg);
+
+        std::array<uint8_t, 512> file_data{};
+        in.read(reinterpret_cast<char*>(file_data.data()), static_cast<std::streamsize>(file_data.size()));
+        REQUIRE(in.gcount() == static_cast<std::streamsize>(file_data.size()));
+        REQUIRE(file_data == expected);
+    }
+
+    {
+        SdCardBasic sd(image, false, true);
+        auto readback = read_sector(sd, 1);
+        REQUIRE(readback == expected);
     }
 
     std::filesystem::remove(image);

@@ -13,13 +13,25 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 
 ABI_MAJOR = 1
-ABI_MINOR = 0
+ABI_MINOR = 1
 VECTOR_START = 0xFFFA
 STRIDE = 3
 
 # Single source of truth for entry ordering and implementation targets.
 # Keep stable public API entries at their legacy addresses.
 ENTRIES = [
+    ("BCOS_JT_FS_CHDIR", "_fs_chdir_syscall"),
+    ("BCOS_JT_FS_GETCWD", "_fs_getcwd_user_syscall"),
+    ("BCOS_JT_FS_OPEN", "_fs_open_syscall"),
+    ("BCOS_JT_FS_OPEN_EX", "_fs_open_ex_syscall"),
+    ("BCOS_JT_FS_READ_BYTE", "_fs_read_byte_syscall"),
+    ("BCOS_JT_FS_READ_BLOCK", "_fs_read_block_syscall"),
+    ("BCOS_JT_FS_STAT", "_fs_stat_syscall"),
+    ("BCOS_JT_FS_READDIR", "_fs_readdir_syscall"),
+    ("BCOS_JT_FS_CREATE", "_fs_create_syscall"),
+    ("BCOS_JT_FS_WRITE_BLOCK", "_fs_write_block_syscall"),
+    ("BCOS_JT_FS_FLUSH", "_fs_flush_syscall"),
+    ("BCOS_JT_FS_CLOSE", "_fs_close_syscall"),
     ("BCOS_JT_ABI_MAJOR", "bcos_get_abi_major"),
     ("BCOS_JT_ABI_MINOR", "bcos_get_abi_minor"),
     ("BCOS_JT_RESERVED0", "bcos_reserved"),
@@ -98,10 +110,12 @@ def generate_jumptable_s() -> str:
 
 def generate_sbc_cfg() -> str:
     return f"""MEMORY {{
-    ZP:     start = $20,   size = $40,   type = rw, define = yes;
+    ZP:     start = $20,   size = $30,   type = rw, define = yes;
     RAM:    start = $0300, size = $0500, define = yes;
-    ROM:    start = $C000, size = $4000, fill = $00, type = ro;
-    BANK2:  start = $A000, size = $2000, fill = $00, type = ro;
+    ROM:    file = %O, start = $C000, size = $4000, fill = yes, fillval = $00, type = ro;
+    BANK2:  file = %O, start = $A000, size = $2000, fill = yes, fillval = $00, type = ro;
+    BANK3:  file = %O, start = $A000, size = $2000, fill = yes, fillval = $00, type = ro;
+    BANK4:  file = %O, start = $A000, size = $2000, fill = yes, fillval = $00, type = ro;
 }}
 
 SEGMENTS {{
@@ -115,6 +129,10 @@ SEGMENTS {{
     RODATA:    load = ROM, type = ro;
     B2CODE:    load = BANK2, type = ro;
     B2RODATA:  load = BANK2, type = ro;
+    B3CODE:    load = BANK3, type = ro;
+    B3RODATA:  load = BANK3, type = ro;
+    B4CODE:    load = BANK4, type = ro;
+    B4RODATA:  load = BANK4, type = ro;
     JUMPTABLE: load = ROM, type=ro,    start= ${JT_BASE:04X};
     VECTORS:   load = ROM, type = ro,  start    = ${VECTOR_START:04X};
 }}
@@ -159,15 +177,91 @@ def generate_c_header() -> str:
 #define BCOS_JT_PUTHEX    0x{names['BCOS_JT_PUTHEX']:04X}u
 #define BCOS_JT_PUTDEC    0x{names['BCOS_JT_PUTDEC']:04X}u
 #define BCOS_JT_GETCH     0x{names['BCOS_JT_GETCH']:04X}u
+#define BCOS_JT_FS_CHDIR  0x{names['BCOS_JT_FS_CHDIR']:04X}u
+#define BCOS_JT_FS_GETCWD 0x{names['BCOS_JT_FS_GETCWD']:04X}u
+#define BCOS_JT_FS_OPEN   0x{names['BCOS_JT_FS_OPEN']:04X}u
+#define BCOS_JT_FS_OPEN_EX 0x{names['BCOS_JT_FS_OPEN_EX']:04X}u
+#define BCOS_JT_FS_READ_BYTE 0x{names['BCOS_JT_FS_READ_BYTE']:04X}u
+#define BCOS_JT_FS_READ_BLOCK 0x{names['BCOS_JT_FS_READ_BLOCK']:04X}u
+#define BCOS_JT_FS_STAT   0x{names['BCOS_JT_FS_STAT']:04X}u
+#define BCOS_JT_FS_READDIR 0x{names['BCOS_JT_FS_READDIR']:04X}u
+#define BCOS_JT_FS_CREATE 0x{names['BCOS_JT_FS_CREATE']:04X}u
+#define BCOS_JT_FS_WRITE_BLOCK 0x{names['BCOS_JT_FS_WRITE_BLOCK']:04X}u
+#define BCOS_JT_FS_FLUSH  0x{names['BCOS_JT_FS_FLUSH']:04X}u
+#define BCOS_JT_FS_CLOSE  0x{names['BCOS_JT_FS_CLOSE']:04X}u
 
 #define BCOS_ARGC_ADDR    0x0600u
 #define BCOS_ARGV_ADDR    0x0601u
+
+typedef int8_t fs_fd_t;
+
+#define BCOS_OK             0x00u
+#define BCOS_ERR_GENERIC    0xFFu
+#define BCOS_ERR_NOT_FOUND  0xFEu
+#define BCOS_ERR_BAD_NAME   0xFCu
+#define BCOS_ERR_EOF        0xFBu
+#define BCOS_ERR_BAD_FD     0xFAu
+
+#define BCOS_FS_ATTR_DIR    0x10u
+
+#define BCOS_FS_OPEN_READ   0x01u
+#define BCOS_FS_OPEN_CREATE 0x02u
+
+typedef struct bcos_fs_getcwd {{
+    char* buffer;
+    uint8_t length;
+    uint8_t status;
+}} bcos_fs_getcwd_t;
+
+typedef struct bcos_fs_open {{
+    const char* path;
+    uint8_t mode;
+    fs_fd_t fd;
+    uint8_t status;
+}} bcos_fs_open_t;
+
+typedef struct bcos_fs_rw {{
+    fs_fd_t fd;
+    uint8_t* buffer;
+    uint16_t length;
+    uint16_t actual;
+    uint8_t status;
+}} bcos_fs_rw_t;
+
+typedef struct bcos_fs_stat {{
+    const char* path;
+    uint8_t attrib;
+    uint32_t size;
+    uint32_t cluster;
+    uint8_t status;
+}} bcos_fs_stat_t;
+
+typedef struct bcos_fs_dirent {{
+    uint8_t index;
+    char name[12];
+    uint8_t attrib;
+    uint32_t size;
+    uint32_t cluster;
+    uint8_t status;
+}} bcos_fs_dirent_t;
 
 #define bcos_abi_major ((uint8_t (*)(void))BCOS_JT_ABI_MAJOR)
 #define bcos_abi_minor ((uint8_t (*)(void))BCOS_JT_ABI_MINOR)
 #define putstr         ((void (*)(const uint8_t*))BCOS_JT_PUTSTR)
 #define putstrnl       ((void (*)(const uint8_t*))BCOS_JT_PUTSTRNL)
 #define putch          ((void (*)(uint8_t))BCOS_JT_PUTCH)
+#define fs_chdir       ((uint8_t (*)(const char*))BCOS_JT_FS_CHDIR)
+#define fs_getcwd      ((uint8_t (*)(bcos_fs_getcwd_t*))BCOS_JT_FS_GETCWD)
+#define fs_open        ((fs_fd_t (*)(const char*))BCOS_JT_FS_OPEN)
+#define fs_open_ex     ((uint8_t (*)(bcos_fs_open_t*))BCOS_JT_FS_OPEN_EX)
+#define fs_read_byte   ((int16_t (*)(fs_fd_t))BCOS_JT_FS_READ_BYTE)
+#define fs_read_block  ((uint8_t (*)(bcos_fs_rw_t*))BCOS_JT_FS_READ_BLOCK)
+#define fs_stat        ((uint8_t (*)(bcos_fs_stat_t*))BCOS_JT_FS_STAT)
+#define fs_readdir     ((uint8_t (*)(bcos_fs_dirent_t*))BCOS_JT_FS_READDIR)
+#define fs_create      ((fs_fd_t (*)(const char*))BCOS_JT_FS_CREATE)
+#define fs_write_block ((uint8_t (*)(bcos_fs_rw_t*))BCOS_JT_FS_WRITE_BLOCK)
+#define fs_flush       ((uint8_t (*)(fs_fd_t))BCOS_JT_FS_FLUSH)
+#define fs_close       ((void (*)(fs_fd_t))BCOS_JT_FS_CLOSE)
 
 #define BCOS_ABI_COMPATIBLE() ((bcos_abi_major() == BCOS_ABI_MAJOR) && (bcos_abi_minor() >= BCOS_ABI_MINOR))
 

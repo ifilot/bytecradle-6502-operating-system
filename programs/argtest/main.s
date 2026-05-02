@@ -16,15 +16,15 @@
 
 .segment	"RODATA"
 
-L0011:
+L0012:
 	.byte	$41,$52,$47,$43,$3D,$00
-L0020:
+L0021:
 	.byte	$41,$52,$47,$56,$5B,$00
-L0024:
+L0025:
 	.byte	$25,$75,$00
-L002C:
+L002D:
 	.byte	$5D,$3D,$00
-L000C	:=	L0024+0
+L000D	:=	L0025+0
 
 ; ---------------------------------------------------------------
 ; int __near__ main (void)
@@ -47,15 +47,15 @@ L000C	:=	L0024+0
 	lda     #$DC
 	jsr     callax
 	eor     #$01
-	beq     L0005
+	beq     L0006
 	ldx     #$00
 	lda     #$01
-	jmp     L0001
-L0005:	lda     sp
+	jmp     L0002
+L0006:	lda     sp
 	ldx     sp+1
 	jsr     pushax
-	lda     #<(L000C)
-	ldx     #>(L000C)
+	lda     #<(L000D)
+	ldx     #>(L000D)
 	jsr     pushax
 	ldy     #$0E
 	lda     (sp),y
@@ -65,8 +65,8 @@ L0005:	lda     sp
 	ldx     #$FF
 	lda     #$E5
 	jsr     pushax
-	lda     #<(L0011)
-	ldx     #>(L0011)
+	lda     #<(L0012)
+	ldx     #>(L0012)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -92,18 +92,18 @@ L0005:	lda     sp
 	jsr     incsp2
 	lda     #$00
 	ldy     #$0B
-L0037:	sta     (sp),y
+L0038:	sta     (sp),y
 	lda     (sp),y
 	jsr     pusha0
 	ldy     #$0C
 	lda     (sp),y
 	jsr     tosicmp0
-	jcs     L0017
+	jcs     L0018
 	ldx     #$FF
 	lda     #$E5
 	jsr     pushax
-	lda     #<(L0020)
-	ldx     #>(L0020)
+	lda     #<(L0021)
+	ldx     #>(L0021)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -116,8 +116,8 @@ L0037:	sta     (sp),y
 	lda     sp
 	ldx     sp+1
 	jsr     pushax
-	lda     #<(L0024)
-	ldx     #>(L0024)
+	lda     #<(L0025)
+	ldx     #>(L0025)
 	jsr     pushax
 	ldy     #$0F
 	lda     (sp),y
@@ -141,8 +141,8 @@ L0037:	sta     (sp),y
 	ldx     #$FF
 	lda     #$E5
 	jsr     pushax
-	lda     #<(L002C)
-	ldx     #>(L002C)
+	lda     #<(L002D)
+	ldx     #>(L002D)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -159,10 +159,10 @@ L0037:	sta     (sp),y
 	ldy     #$0D
 	lda     (sp),y
 	asl     a
-	bcc     L0034
+	bcc     L0035
 	inx
 	clc
-L0034:	ldy     #$0A
+L0035:	ldy     #$0A
 	adc     (sp),y
 	pha
 	txa
@@ -183,10 +183,10 @@ L0034:	ldy     #$0A
 	ldy     #$0B
 	lda     (sp),y
 	ina
-	jmp     L0037
-L0017:	ldx     #$00
+	jmp     L0038
+L0018:	ldx     #$00
 	txa
-L0001:	ldy     #$0C
+L0002:	ldy     #$0C
 	jmp     addysp
 
 .endproc

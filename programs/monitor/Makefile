@@ -2,7 +2,7 @@ GEN_BCOS := ../../src/generate_bcos_artifacts.py
 GEN_MON := generate_monitor_jumptable.py
 PATCH := ../common/patch_com_header.py
 ABI_MAJOR := 1
-ABI_MINOR := 0
+ABI_MINOR := 1
 
 PROGNAME = monitor
 

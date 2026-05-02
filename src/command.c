@@ -19,6 +19,7 @@
  **************************************************************************/
 
 #include "command.h"
+#include "fs/fat32_internal.h"
 #include "version.h"
 #include "crc16.h"
 
@@ -27,6 +28,16 @@ static char* command_argv[20];
 static uint8_t command_argc;
 static uint8_t command_parse_too_many_args;
 static char* command_ptr = command_buffer;
+
+static uint8_t command_bank_enter(void) {
+    uint8_t prev = get_rombank();
+    set_rombank(COMMAND_ROM_BANK);
+    return prev;
+}
+
+static void command_bank_exit(uint8_t prev) {
+    set_rombank(prev);
+}
 
 /*
  * Argument list (argv / argc) position
@@ -50,6 +61,7 @@ typedef struct {
 /*
  * List of system commands
  */
+#pragma rodata-name(push, "B4RODATA")
 static const CommandEntry command_table[] = {
     { "LS", command_ls },
     { "DIR", command_ls },
@@ -61,14 +73,32 @@ static const CommandEntry command_table[] = {
     { "SDINFO", command_sdinfo },
     { "VERSION", command_version },
 };
+#pragma rodata-name(pop)
 
 // forward declarations
+static void command_loop_impl(void);
+static void command_pwdcmd_impl(void);
 static uint8_t command_is_probably_binary(const uint8_t *data, uint32_t size);
 
 /**
  * @brief Continuously sample keyboard input, retrieve and parse commands
  */
 void command_loop() {
+    uint8_t prev = command_bank_enter();
+    command_loop_impl();
+    command_bank_exit(prev);
+}
+
+void command_pwdcmd() {
+    uint8_t prev = command_bank_enter();
+    command_pwdcmd_impl();
+    command_bank_exit(prev);
+}
+
+#pragma code-name(push, "B4CODE")
+#pragma rodata-name(push, "B4RODATA")
+
+static void command_loop_impl(void) {
     uint8_t c;
     const char *command_end = command_buffer + sizeof(command_buffer) - 1;
 
@@ -111,12 +141,12 @@ void command_exec() {
         putstrnl("Too many arguments");
         command_ptr = command_buffer;
         memset(command_buffer, 0x00, sizeof(command_buffer));
-        command_pwdcmd();
+        command_pwdcmd_impl();
         return;
     }
 
     if(command_argc == 0) {
-        command_pwdcmd();
+        command_pwdcmd_impl();
         return;
     }
 
@@ -137,7 +167,7 @@ void command_exec() {
 
     command_ptr = command_buffer;
     memset(command_buffer, 0x00, sizeof(command_buffer));
-    command_pwdcmd();
+    command_pwdcmd_impl();
 }
 
 /**
@@ -279,7 +309,7 @@ void command_touch() {
 /**
  * @brief Places the current working directory on the screen
  */
-void command_pwdcmd() {
+static void command_pwdcmd_impl(void) {
     char buf[80];
 
     // ensure proper RAM bank
@@ -467,7 +497,9 @@ uint8_t command_try_com() {
     command_store_program_args();
 
     program = (void(*)(void))(hdr.load_addr + COM_HEADER_SIZE);
+    fs_syscall_stack_reset();
     program();
+    fs_syscall_stack_reset();
     memset((void*)0x0800, 0xFF, 0x7700);    // clean up user space
     return 0;
 }
@@ -584,3 +616,6 @@ static uint8_t command_is_probably_binary(const uint8_t *data, uint32_t size) {
 
     return (uint8_t)((uint32_t)suspicious * 10 > sample);
 }
+
+#pragma rodata-name(pop)
+#pragma code-name(pop)

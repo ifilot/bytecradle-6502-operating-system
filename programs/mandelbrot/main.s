@@ -20,7 +20,7 @@
 _gradient:
 	.byte	$20,$2E,$2D,$27,$7C,$2B,$2F,$3D,$2A,$24,$26,$23,$40,$4D,$57,$58
 	.byte	$00
-L0005:
+L0006:
 	.byte	$50,$6C,$6F,$74,$74,$69,$6E,$67,$20,$4D,$61,$6E,$64,$65,$6C,$62
 	.byte	$72,$6F,$74,$20,$73,$65,$74,$20,$62,$65,$74,$77,$65,$65,$6E,$20
 	.byte	$5B,$2D,$32,$2C,$20,$31,$5D,$20,$78,$20,$5B,$2D,$31,$2C,$20,$31
@@ -41,8 +41,8 @@ L0005:
 	ldx     #$FF
 	lda     #$E8
 	jsr     pushax
-	lda     #<(L0005)
-	ldx     #>(L0005)
+	lda     #<(L0006)
+	ldx     #>(L0006)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -60,16 +60,16 @@ L0005:
 	ldy     #$01
 	jsr     staxysp
 	txa
-L0068:	ldy     #$19
+L0069:	ldy     #$19
 	jsr     staxysp
 	ldy     #$1A
 	lda     (sp),y
 	cmp     #$00
-	bne     L0018
+	bne     L0019
 	dey
 	lda     (sp),y
 	cmp     #$18
-L0018:	jcs     L0012
+L0019:	jcs     L0013
 	ldy     #$1C
 	jsr     pushwysp
 	ldy     #$04
@@ -83,16 +83,16 @@ L0018:	jcs     L0012
 	jsr     staxysp
 	ldx     #$00
 	txa
-L0067:	ldy     #$1B
+L0068:	ldy     #$1B
 	jsr     staxysp
 	ldy     #$1C
 	lda     (sp),y
 	cmp     #$00
-	bne     L0025
+	bne     L0026
 	dey
 	lda     (sp),y
 	cmp     #$50
-L0025:	jcs     L001F
+L0026:	jcs     L0020
 	ldy     #$1E
 	jsr     pushwysp
 	ldy     #$06
@@ -118,8 +118,8 @@ L0025:	jcs     L001F
 	jsr     steaxysp
 	ldy     #$0B
 	jsr     steaxysp
-	jmp     L004C
-L0031:	ldy     #$12
+	jmp     L004D
+L0032:	ldy     #$12
 	jsr     ldeaxysp
 	jsr     pusheax
 	ldy     #$16
@@ -187,25 +187,25 @@ L0031:	ldy     #$12
 	cmp     #$01
 	txa
 	sbc     #$04
-	bvs     L004A
+	bvs     L004B
 	eor     #$80
-L004A:	bmi     L0032
+L004B:	bmi     L0033
 	ldy     #$18
 	jsr     ldaxysp
 	ina
-	bne     L004C
+	bne     L004D
 	inx
-L004C:	ldy     #$17
+L004D:	ldy     #$17
 	jsr     staxysp
 	ldy     #$18
 	lda     (sp),y
 	cmp     #$00
-	bne     L0035
+	bne     L0036
 	dey
 	lda     (sp),y
 	cmp     #$40
-L0035:	jcc     L0031
-L0032:	ldy     #$1A
+L0036:	jcc     L0032
+L0033:	ldy     #$1A
 	jsr     pushwysp
 	lda     #$0F
 	jsr     tosumula0
@@ -238,10 +238,10 @@ L0032:	ldy     #$1A
 	sta     regsave
 	stx     regsave+1
 	ina
-	jne     L0067
+	jne     L0068
 	inx
-	jmp     L0067
-L001F:	ldx     #$FF
+	jmp     L0068
+L0020:	ldx     #$FF
 	lda     #$EB
 	jsr     pushax
 	lda     #$0D
@@ -270,10 +270,10 @@ L001F:	ldx     #$FF
 	ldy     #$1A
 	jsr     ldaxysp
 	ina
-	jne     L0068
+	jne     L0069
 	inx
-	jmp     L0068
-L0012:	ldy     #$1D
+	jmp     L0069
+L0013:	ldy     #$1D
 	jmp     addysp
 
 .endproc
@@ -292,11 +292,11 @@ L0012:	ldy     #$1D
 	lda     #$DC
 	jsr     callax
 	eor     #$01
-	beq     L005D
+	beq     L005E
 	ldx     #$00
 	lda     #$01
 	rts
-L005D:	jsr     _mandelbrot
+L005E:	jsr     _mandelbrot
 	ldx     #$00
 	txa
 	rts

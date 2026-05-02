@@ -23,7 +23,7 @@
 
 #define BCOS_VERSION "0.1.0"
 #define BCOS_ABI_MAJOR 1
-#define BCOS_ABI_MINOR 0
+#define BCOS_ABI_MINOR 1
 
 #define COM_HEADER_SIZE 8
 

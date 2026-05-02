@@ -14,6 +14,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 EMU = ROOT / "emulator" / "build" / "bc6502emu"
 BCOS_ROM = ROOT / "src" / "bin" / "bcos.bin"
 REQUIRED_TOOLS = ("cmake", "make", "cc65", "ca65", "ld65")
+CMD_TIMEOUT_S = 120
 
 
 def missing_tools() -> list[str]:
@@ -21,7 +22,7 @@ def missing_tools() -> list[str]:
 
 
 def run_cmd(cmd: list[str], *, cwd: pathlib.Path = ROOT) -> None:
-    subprocess.run(cmd, cwd=cwd, check=True)
+    subprocess.run(cmd, cwd=cwd, check=True, timeout=CMD_TIMEOUT_S)
 
 
 def build_all_once() -> None:

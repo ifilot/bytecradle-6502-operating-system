@@ -16,54 +16,54 @@
 
 .segment	"RODATA"
 
-L0063:
+L0064:
 	.byte	$42,$61,$6E,$6B,$20,$72,$61,$6E,$67,$65,$3A,$20,$24,$25,$30,$32
 	.byte	$58,$2D,$24,$25,$30,$32,$58,$20,$28,$73,$61,$66,$65,$20,$6E,$6F
 	.byte	$6E,$2D,$4F,$53,$20,$62,$61,$6E,$6B,$73,$29,$00
-L006C:
+L006D:
 	.byte	$50,$61,$74,$74,$65,$72,$6E,$73,$3A,$20,$41,$35,$5E,$6F,$66,$66
 	.byte	$73,$65,$74,$5E,$62,$61,$6E,$6B,$2C,$20,$69,$6E,$76,$65,$72,$73
 	.byte	$65,$2C,$20,$72,$65,$73,$74,$6F,$72,$65,$00
-L005F:
+L0060:
 	.byte	$54,$65,$73,$74,$69,$6E,$67,$20,$77,$72,$69,$74,$61,$62,$6C,$65
 	.byte	$20,$62,$61,$6E,$6B,$65,$64,$20,$52,$41,$4D,$3A,$20,$24,$38,$30
 	.byte	$30,$30,$2D,$24,$39,$46,$46,$46,$00
-L00A8:
+L00A9:
 	.byte	$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D
 	.byte	$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D,$2D
 	.byte	$2D,$2D,$2D,$2D,$2D,$2D,$00
-L004F:
+L0050:
 	.byte	$3D,$3D,$3D,$20,$42,$59,$54,$45,$43,$52,$41,$44,$4C,$45,$20,$44
 	.byte	$49,$41,$47,$4E,$4F,$53,$54,$49,$43,$53,$20,$28,$44,$49,$41,$47
 	.byte	$29,$20,$3D,$3D,$3D,$00
-L0053:
+L0054:
 	.byte	$4D,$65,$6D,$6F,$72,$79,$20,$62,$61,$6E,$6B,$20,$74,$65,$73,$74
 	.byte	$20,$28,$6E,$6F,$6E,$2D,$64,$65,$73,$74,$72,$75,$63,$74,$69,$76
 	.byte	$65,$29,$2E,$00
-L0079:
+L007A:
 	.byte	$5B,$42,$41,$4E,$4B,$20,$25,$30,$32,$75,$2F,$24,$25,$30,$32,$58
 	.byte	$5D,$20,$74,$65,$73,$74,$69,$6E,$67,$2E,$2E,$2E,$00
-L008D:
+L008E:
 	.byte	$46,$61,$69,$6C,$20,$62,$61,$6E,$6B,$3D,$24,$25,$30,$32,$58,$20
 	.byte	$6F,$66,$66,$73,$65,$74,$3D,$24,$25,$30,$34,$58,$00
-L0096:
+L0097:
 	.byte	$45,$78,$70,$65,$63,$74,$65,$64,$3D,$24,$25,$30,$32,$58,$20,$41
 	.byte	$63,$74,$75,$61,$6C,$3D,$24,$25,$30,$32,$58,$00
-L00AC:
+L00AD:
 	.byte	$53,$55,$4D,$4D,$41,$52,$59,$3A,$20,$50,$41,$53,$53,$20,$28,$25
 	.byte	$75,$2F,$25,$75,$20,$62,$61,$6E,$6B,$73,$29,$00
-L00B5:
+L00B6:
 	.byte	$52,$41,$4D,$20,$62,$61,$6E,$6B,$20,$72,$65,$73,$74,$6F,$72,$65
 	.byte	$64,$20,$74,$6F,$20,$24,$25,$30,$32,$58,$00
-L0057:
+L0058:
 	.byte	$49,$6E,$69,$74,$69,$61,$6C,$20,$52,$41,$4D,$20,$62,$61,$6E,$6B
 	.byte	$3A,$20,$24,$25,$30,$32,$58,$00
-L0047:
+L0048:
 	.byte	$44,$49,$41,$47,$3A,$20,$41,$42,$49,$20,$6D,$69,$73,$6D,$61,$74
 	.byte	$63,$68,$2E,$00
-L0089:
+L008A:
 	.byte	$52,$45,$53,$55,$4C,$54,$3A,$20,$46,$41,$49,$4C,$00
-L00A1:
+L00A2:
 	.byte	$20,$2D,$3E,$20,$50,$41,$53,$53,$00
 
 ; ---------------------------------------------------------------
@@ -84,13 +84,13 @@ L00A1:
 	ldx     #$80
 	lda     #$00
 	jsr     stax0sp
-L0005:	ldy     #$01
+L0006:	ldy     #$01
 	lda     (sp),y
 	cmp     #$A0
-	bne     L00C3
+	bne     L00C4
 	lda     (sp)
-	jeq     L0006
-L00C3:	jsr     pushw0sp
+	jeq     L0007
+L00C4:	jsr     pushw0sp
 	ldy     #$03
 	jsr     ldaxysp
 	sec
@@ -132,7 +132,7 @@ L00C3:	jsr     pushw0sp
 	lda     (ptr1)
 	ldy     #$01
 	cmp     (sp),y
-	beq     L0017
+	beq     L0018
 	ldy     #$0A
 	jsr     ldaxysp
 	sta     ptr1
@@ -172,7 +172,7 @@ L00C3:	jsr     pushw0sp
 	txa
 	jsr     incsp7
 	jmp     incsp5
-L0017:	ldy     #$06
+L0018:	ldy     #$06
 	jsr     ldaxysp
 	sta     ptr1
 	stx     ptr1+1
@@ -184,7 +184,7 @@ L0017:	ldy     #$06
 	stx     ptr1+1
 	lda     (ptr1)
 	cmp     (sp)
-	beq     L0024
+	beq     L0025
 	ldy     #$0A
 	jsr     ldaxysp
 	sta     ptr1
@@ -223,7 +223,7 @@ L0017:	ldy     #$06
 	txa
 	jsr     incsp7
 	jmp     incsp5
-L0024:	ldy     #$06
+L0025:	ldy     #$06
 	jsr     ldaxysp
 	sta     ptr1
 	stx     ptr1+1
@@ -238,7 +238,7 @@ L0024:	ldy     #$06
 	lda     (ptr1)
 	ldy     #$02
 	cmp     (sp),y
-	beq     L0031
+	beq     L0032
 	ldy     #$0A
 	jsr     ldaxysp
 	sta     ptr1
@@ -278,11 +278,11 @@ L0024:	ldy     #$06
 	txa
 	jsr     incsp7
 	jmp     incsp5
-L0031:	jsr     incsp7
+L0032:	jsr     incsp7
 	lda     #$01
 	jsr     addeq0sp
-	jmp     L0005
-L0006:	tax
+	jmp     L0006
+L0007:	tax
 	tya
 	jmp     incsp5
 
@@ -308,12 +308,12 @@ L0006:	tax
 	lda     #$DC
 	jsr     callax
 	eor     #$01
-	beq     L00C5
+	beq     L00C6
 	ldx     #$FF
 	lda     #$E8
 	jsr     pushax
-	lda     #<(L0047)
-	ldx     #>(L0047)
+	lda     #<(L0048)
+	ldx     #>(L0048)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -325,15 +325,15 @@ L0006:	tax
 	jsr     incsp2
 	ldx     #$00
 	lda     #$01
-	jmp     L003D
-L00C5:	lda     $7FC0
+	jmp     L003E
+L00C6:	lda     $7FC0
 	ldy     #$45
 	sta     (sp),y
 	ldx     #$FF
 	lda     #$E8
 	jsr     pushax
-	lda     #<(L004F)
-	ldx     #>(L004F)
+	lda     #<(L0050)
+	ldx     #>(L0050)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -346,8 +346,8 @@ L00C5:	lda     $7FC0
 	ldx     #$FF
 	lda     #$E8
 	jsr     pushax
-	lda     #<(L0053)
-	ldx     #>(L0053)
+	lda     #<(L0054)
+	ldx     #>(L0054)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -360,8 +360,8 @@ L00C5:	lda     $7FC0
 	lda     #$05
 	jsr     leaa0sp
 	jsr     pushax
-	lda     #<(L0057)
-	ldx     #>(L0057)
+	lda     #<(L0058)
+	ldx     #>(L0058)
 	jsr     pushax
 	ldy     #$49
 	lda     (sp),y
@@ -385,8 +385,8 @@ L00C5:	lda     $7FC0
 	ldx     #$FF
 	lda     #$E8
 	jsr     pushax
-	lda     #<(L005F)
-	ldx     #>(L005F)
+	lda     #<(L0060)
+	ldx     #>(L0060)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -399,8 +399,8 @@ L00C5:	lda     $7FC0
 	lda     #$05
 	jsr     leaa0sp
 	jsr     pushax
-	lda     #<(L0063)
-	ldx     #>(L0063)
+	lda     #<(L0064)
+	ldx     #>(L0064)
 	jsr     pushax
 	lda     #$04
 	jsr     pusha0
@@ -425,8 +425,8 @@ L00C5:	lda     $7FC0
 	ldx     #$FF
 	lda     #$E8
 	jsr     pushax
-	lda     #<(L006C)
-	ldx     #>(L006C)
+	lda     #<(L006D)
+	ldx     #>(L006D)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -438,9 +438,9 @@ L00C5:	lda     $7FC0
 	jsr     incsp2
 	lda     #$04
 	ldy     #$48
-L00C4:	sta     (sp),y
+L00C5:	sta     (sp),y
 	cmp     #$40
-	jcs     L006F
+	jcs     L0070
 	ldy     #$46
 	clc
 	lda     #$01
@@ -449,8 +449,8 @@ L00C4:	sta     (sp),y
 	lda     #$05
 	jsr     leaa0sp
 	jsr     pushax
-	lda     #<(L0079)
-	ldx     #>(L0079)
+	lda     #<(L007A)
+	ldx     #>(L007A)
 	jsr     pushax
 	ldy     #$4C
 	lda     (sp),y
@@ -481,15 +481,15 @@ L00C4:	sta     (sp),y
 	jsr     leaa0sp
 	jsr     _test_bank_non_destructive
 	cmp     #$00
-	jne     L0080
+	jne     L0081
 	ldy     #$45
 	lda     (sp),y
 	sta     $7FC0
 	ldx     #$FF
 	lda     #$E8
 	jsr     pushax
-	lda     #<(L0089)
-	ldx     #>(L0089)
+	lda     #<(L008A)
+	ldx     #>(L008A)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -502,8 +502,8 @@ L00C4:	sta     (sp),y
 	lda     #$05
 	jsr     leaa0sp
 	jsr     pushax
-	lda     #<(L008D)
-	ldx     #>(L008D)
+	lda     #<(L008E)
+	ldx     #>(L008E)
 	jsr     pushax
 	ldy     #$04
 	lda     (sp),y
@@ -529,8 +529,8 @@ L00C4:	sta     (sp),y
 	lda     #$05
 	jsr     leaa0sp
 	jsr     pushax
-	lda     #<(L0096)
-	ldx     #>(L0096)
+	lda     #<(L0097)
+	ldx     #>(L0097)
 	jsr     pushax
 	ldy     #$07
 	lda     (sp),y
@@ -556,8 +556,8 @@ L00C4:	sta     (sp),y
 	jsr     incsp2
 	ldx     #$00
 	lda     #$02
-	jmp     L003D
-L0080:	ldy     #$47
+	jmp     L003E
+L0081:	ldy     #$47
 	clc
 	lda     #$01
 	adc     (sp),y
@@ -565,8 +565,8 @@ L0080:	ldy     #$47
 	ldx     #$FF
 	lda     #$E8
 	jsr     pushax
-	lda     #<(L00A1)
-	ldx     #>(L00A1)
+	lda     #<(L00A2)
+	ldx     #>(L00A2)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -580,15 +580,15 @@ L0080:	ldy     #$47
 	clc
 	lda     #$01
 	adc     (sp),y
-	jmp     L00C4
-L006F:	ldy     #$45
+	jmp     L00C5
+L0070:	ldy     #$45
 	lda     (sp),y
 	sta     $7FC0
 	ldx     #$FF
 	lda     #$E8
 	jsr     pushax
-	lda     #<(L00A8)
-	ldx     #>(L00A8)
+	lda     #<(L00A9)
+	ldx     #>(L00A9)
 	pha
 	lda     (sp)
 	sta     jmpvec+1
@@ -601,8 +601,8 @@ L006F:	ldy     #$45
 	lda     #$05
 	jsr     leaa0sp
 	jsr     pushax
-	lda     #<(L00AC)
-	ldx     #>(L00AC)
+	lda     #<(L00AD)
+	ldx     #>(L00AD)
 	jsr     pushax
 	ldy     #$4B
 	lda     (sp),y
@@ -629,8 +629,8 @@ L006F:	ldy     #$45
 	lda     #$05
 	jsr     leaa0sp
 	jsr     pushax
-	lda     #<(L00B5)
-	ldx     #>(L00B5)
+	lda     #<(L00B6)
+	ldx     #>(L00B6)
 	jsr     pushax
 	ldy     #$49
 	lda     (sp),y
@@ -653,7 +653,7 @@ L006F:	ldy     #$45
 	jsr     incsp2
 	ldx     #$00
 	txa
-L003D:	ldy     #$49
+L003E:	ldy     #$49
 	jmp     addysp
 
 .endproc

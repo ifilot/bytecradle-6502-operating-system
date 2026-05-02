@@ -21,6 +21,7 @@ ASRCS := $(filter-out jumptable.s,$(wildcard *.s)) $(wildcard fs/*.s)
 
 # generated assembly from C
 CASMS := $(patsubst %.c,$(ASMDIR)/%.s,$(CSRCS))
+CHDRS := $(wildcard *.h) $(wildcard fs/*.h)
 
 # object files
 OBJS := $(patsubst $(ASMDIR)/%.s,$(OBJDIR)/%.o,$(CASMS)) \
@@ -43,6 +44,8 @@ $(ASMDIR)/%.s: %.c | $(ASMDIR)
 	@mkdir -p $(dir $@)
 	$(CC) -I . -t none -O -Os --cpu 65c02 $< -o $@
 
+$(CASMS): $(CHDRS)
+
 # ASM -> OBJ (generated asm)
 $(OBJDIR)/%.o: $(ASMDIR)/%.s | $(OBJDIR)
 	@mkdir -p $(dir $@)
@@ -51,6 +54,9 @@ $(OBJDIR)/%.o: $(ASMDIR)/%.s | $(OBJDIR)
 # ASM -> OBJ (handwritten asm)
 $(OBJDIR)/%.o: %.s | $(OBJDIR)
 	@mkdir -p $(dir $@)
+	$(AS) -I . $< -o $@
+
+$(OBJDIR)/abi.o: abi.s jumptable.inc | $(OBJDIR)
 	$(AS) -I . $< -o $@
 
 # generated jump table object
@@ -65,7 +71,7 @@ $(BINDIR)/sbc.lib: $(OBJDIR)/crt0.o | $(BINDIR)
 # link
 $(BINDIR)/$(ROMNAME): generate sbc.cfg $(OBJS) $(BINDIR)/sbc.lib | $(BINDIR)
 	$(LD) -C sbc.cfg $(OBJS) -o $@ $(BINDIR)/sbc.lib -m $(BINDIR)/sbc.map
-	truncate -s 24576 $@
+	truncate -s 40960 $@
 
 # run with safety checks
 run: $(BINDIR)/$(ROMNAME)

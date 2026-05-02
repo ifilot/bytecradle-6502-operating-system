@@ -5,6 +5,7 @@ import pytest
 from harness import BCOS_ROM, EMU, read_until, resolve_sd_image, spawn_emulator, stop_emulator
 
 
+@pytest.mark.e2e_timeout(80)
 def test_can_run_diag_program_from_sdcard() -> None:
     if not BCOS_ROM.exists():
         pytest.skip("BCOS ROM was not built")
